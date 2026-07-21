@@ -4,6 +4,7 @@ Thumbs.db
 
 # Local workspace artifacts
 tmp/
+release/
 *.log
 
 # Frontend build artifacts

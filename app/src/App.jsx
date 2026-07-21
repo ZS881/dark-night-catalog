@@ -21,6 +21,11 @@ import { nightChapters, resolveNightEnding, resolveNightStagePrompt } from "./ni
 import { mbtiQuestions } from "./mbtiQuestions";
 import { getWorldArtifact, worldArchiveData } from "./worldArchive";
 
+const portableAssetUrl = (path) =>
+  path.startsWith("/assets/")
+    ? `${import.meta.env.BASE_URL}assets/${path.slice("/assets/".length)}`
+    : path;
+
 const residents = {
   repair: {
     name: "血线维修员",
@@ -276,7 +281,7 @@ export function App() {
   const nightChoiceHistory = activeNightChapter
     ? nightChoices.map((choiceId, index) => activeNightChapter.stages[index]?.choices.find((choice) => choice.id === choiceId)?.label).filter(Boolean)
     : [];
-  const nightSceneImage = activeNightChapter?.sceneImage ?? selectedResident.image;
+  const nightSceneImage = portableAssetUrl(activeNightChapter?.sceneImage ?? selectedResident.image);
   const currentArtifact = activeNightEnding ? getWorldArtifact(activeRoleplayType, activeNightEnding.status) : null;
   const resonanceTarget = resonanceEntry ? mbtiDossierByType[resonanceEntry.target] : null;
   const visualProfileComplete = ["contour", "gaze", "atmosphere"].every((feature) => Boolean(visualProfile[feature]));
@@ -459,9 +464,10 @@ export function App() {
   const saveGeneratedPhoto = async () => {
     const imageSlug = selectedResident.slug ?? `mbti-${mbtiType.toLowerCase()}`;
     const filename = `暗夜图鉴-${imageSlug}-无文字原图.png`;
+    const residentImageUrl = portableAssetUrl(selectedResident.image);
 
     try {
-      const response = await fetch(selectedResident.image);
+      const response = await fetch(residentImageUrl);
       const blob = await response.blob();
       const imageFile = new File([blob], filename, { type: blob.type || "image/png" });
 
@@ -472,7 +478,7 @@ export function App() {
       }
 
       const download = document.createElement("a");
-      download.href = selectedResident.image;
+      download.href = residentImageUrl;
       download.download = filename;
       document.body.appendChild(download);
       download.click();
@@ -481,7 +487,7 @@ export function App() {
     } catch (error) {
       if (error?.name !== "AbortError") {
         const download = document.createElement("a");
-        download.href = selectedResident.image;
+        download.href = residentImageUrl;
         download.download = filename;
         document.body.appendChild(download);
         download.click();
@@ -503,7 +509,7 @@ export function App() {
 
       {screen === "observe" && (
         <section className="screen observe-screen">
-          <img className="scene-image" src="/assets/expressive-bloodline-maintainer.png" alt="雨夜地铁站内工作的彼界维修员" />
+          <img className="scene-image" src={portableAssetUrl("/assets/expressive-bloodline-maintainer.png")} alt="雨夜地铁站内工作的彼界维修员" />
           <div className="scene-shade" />
           <header className="topbar">
             <button className="icon-button" aria-label="打开世界线档案馆" onClick={openWorldlineArchive}>
@@ -516,7 +522,7 @@ export function App() {
           </header>
 
           <div className="route-badge"><MapPin size={14} weight="fill" /> 都市异体</div>
-          <img className="observation-overlay" src="/assets/observation-overlay.png" alt="" aria-hidden="true" />
+          <img className="observation-overlay" src={portableAssetUrl("/assets/observation-overlay.png")} alt="" aria-hidden="true" />
 
           <div className="observe-copy">
             <span className="eyebrow"><span className="signal-dot" /> 彼界目击 · 07 号维修区</span>
@@ -542,7 +548,7 @@ export function App() {
 
       {screen === "consent" && (
         <section className="screen sheet-screen">
-          <img className="background-image" src="/assets/tunnel-atmosphere.png" alt="潮湿的彼界隧道" />
+          <img className="background-image" src={portableAssetUrl("/assets/tunnel-atmosphere.png")} alt="潮湿的彼界隧道" />
           <div className="sheet-shade" />
           <div className="sheet-card">
             <button className="back-control" onClick={() => setScreen("observe")}><ArrowLeft size={20} /> 返回</button>
@@ -570,7 +576,7 @@ export function App() {
 
       {screen === "visualProfile" && (
         <section className="screen choose-screen visual-profile-screen">
-          <img className="background-image" src="/assets/tunnel-atmosphere.png" alt="潮湿的彼界隧道" />
+          <img className="background-image" src={portableAssetUrl("/assets/tunnel-atmosphere.png")} alt="潮湿的彼界隧道" />
           <div className="sheet-shade" />
           <div className="chooser visual-profile-chooser">
             <button className="back-control light" onClick={() => setScreen("consent")}><ArrowLeft size={20} /> 返回照片确认</button>
@@ -617,7 +623,7 @@ export function App() {
 
       {screen === "choose" && (
         <section className="screen choose-screen">
-          <img className="background-image" src="/assets/tunnel-atmosphere.png" alt="潮湿的彼界隧道" />
+          <img className="background-image" src={portableAssetUrl("/assets/tunnel-atmosphere.png")} alt="潮湿的彼界隧道" />
           <div className="sheet-shade" />
           <div className="chooser">
             <button className="back-control light" onClick={() => setScreen("observe")}><ArrowLeft size={20} /> 重选</button>
@@ -655,7 +661,7 @@ export function App() {
 
       {screen === "mbti" && (
         <section className="screen choose-screen mbti-screen">
-          <img className="background-image" src="/assets/tunnel-atmosphere.png" alt="潮湿的彼界隧道" />
+          <img className="background-image" src={portableAssetUrl("/assets/tunnel-atmosphere.png")} alt="潮湿的彼界隧道" />
           <div className="sheet-shade" />
           <div className="chooser mbti-chooser">
             <button className="back-control light" onClick={() => setScreen("observe")}><ArrowLeft size={20} /> 返回观测</button>
@@ -697,7 +703,7 @@ export function App() {
 
       {isGenerating && (
         <section className="loading-layer" role="status">
-          <img className="loading-image" src={selectedResident.image} alt="" />
+          <img className="loading-image" src={portableAssetUrl(selectedResident.image)} alt="" />
           <div className="loading-shade" />
           <div className="loading-copy"><Crosshair size={32} weight="light" /><strong>{resultSource === "mbti" ? "正在编录人格投影" : "正在校准彼界坐标"}</strong><span>{resultSource === "mbti" ? "正在打开这名居民所在的平行夜班…" : "正在为你寻找同一路线的夜班居民…"}</span></div>
         </section>
@@ -705,7 +711,7 @@ export function App() {
 
       {screen === "record" && !isGenerating && (
         <section className="screen record-screen">
-          <img className="record-image" src={selectedResident.image} alt={`${selectedResident.name}的目击记录`} />
+          <img className="record-image" src={portableAssetUrl(selectedResident.image)} alt={`${selectedResident.name}的目击记录`} />
           <div className="record-shade" />
           <div className="record-top"><span>{resultSource === "mbti" ? "人格投影 · 私密档案" : "彼界目击 · 私密档案"}</span><button className="icon-button" onClick={() => setInfoOpen(true)} aria-label="查看故事说明"><Info size={22} weight="bold" /></button></div>
           <article className="dossier">
@@ -835,7 +841,7 @@ export function App() {
 
       {screen === "deepReport" && deepReport && (
         <section className="screen deep-report-screen">
-          <img className="background-image" src={selectedResident.image} alt="" />
+          <img className="background-image" src={portableAssetUrl(selectedResident.image)} alt="" />
           <div className="sheet-shade deep-report-shade" />
           <article className="deep-report">
             <button className="back-control" onClick={() => setScreen("record")}><ArrowLeft size={20} /> 返回图鉴</button>
@@ -903,7 +909,7 @@ export function App() {
 
       {screen === "worldArchive" && (
         <section className="screen world-archive-screen">
-          <img className="background-image" src="/assets/tunnel-atmosphere.png" alt="潮湿的彼界隧道" />
+          <img className="background-image" src={portableAssetUrl("/assets/tunnel-atmosphere.png")} alt="潮湿的彼界隧道" />
           <div className="sheet-shade" />
           <article className="world-archive-panel">
             <button className="back-control" onClick={() => setScreen("observe")}><ArrowLeft size={20} /> 返回观测</button>
@@ -946,7 +952,7 @@ export function App() {
 
       {screen === "resonance" && resonanceEntry && resonanceTarget && (
         <section className="screen resonance-screen">
-          <img className="background-image" src={resonanceTarget.image} alt={`${resonanceTarget.name}的关联调查画面`} />
+          <img className="background-image" src={portableAssetUrl(resonanceTarget.image)} alt={`${resonanceTarget.name}的关联调查画面`} />
           <div className="sheet-shade resonance-shade" />
           <article className="resonance-panel">
             <button className="back-control" onClick={openWorldlineArchive}><ArrowLeft size={20} /> 返回世界线档案馆</button>
