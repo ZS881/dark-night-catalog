@@ -1,0 +1,9 @@
+# Tencent Cloud EdgeOne
+.env
+.edgeone/*
+.tef_dist/*
+
+# Local build and diagnostic artifacts
+node_modules/
+dist/
+*.log

@@ -1,0 +1,178 @@
+export const mbtiQuestions = [
+  {
+    id: "energy_1",
+    dimension: "EI",
+    prompt: "公司年会结束后，大家组织去 KTV 续摊，你第二天还要上班。你会？",
+    options: [
+      { id: "E2", score: 2, label: "毫不犹豫去！这种热闹场合怎么能少了我，越晚越兴奋。" },
+      { id: "E1", score: 1, label: "去吧，虽然有点累，但和大家待在一起挺开心的。" },
+      { id: "I1", score: -1, label: "不太想去，但不好意思拒绝，勉强待一小时找个借口溜走。" },
+      { id: "I2", score: -2, label: "果断拒绝，直接回家。我需要一个人安静待着恢复精力。" },
+    ],
+  },
+  {
+    id: "energy_2",
+    dimension: "EI",
+    prompt: "你在咖啡厅排队，前面的人突然让你先点，因为他不确定喝什么。你会？",
+    options: [
+      { id: "E2", score: 2, label: "立刻开心地接上，顺势和对方聊两句“这家抹茶拿铁不错哦”。" },
+      { id: "E1", score: 1, label: "礼貌道谢，快速点完，简单微笑一下。" },
+      { id: "I1", score: -1, label: "有点尴尬，小声说谢谢，点完就赶紧退到一边。" },
+      { id: "I2", score: -2, label: "宁愿让他继续站那儿想，我也不想成为被关注的焦点。" },
+    ],
+  },
+  {
+    id: "energy_3",
+    dimension: "EI",
+    prompt: "你刚学会一个新技能（比如做一道菜），你最想做的事是？",
+    options: [
+      { id: "E2", score: 2, label: "马上发朋友圈或喊朋友来家里尝，分享这份喜悦。" },
+      { id: "E1", score: 1, label: "告诉最亲近的一两个人，顺便问问他们要不要试试。" },
+      { id: "I1", score: -1, label: "自己默默记下来，下次需要的时候再用。" },
+      { id: "I2", score: -2, label: "完全不觉得需要分享，这是我自己的事。" },
+    ],
+  },
+  {
+    id: "energy_4",
+    dimension: "EI",
+    prompt: "在小组讨论中，你通常的表现是？",
+    options: [
+      { id: "E2", score: 2, label: "话最多的人之一，经常第一个发言，带动整个讨论节奏。" },
+      { id: "E1", score: 1, label: "该说的时候会说，但不会抢风头，发言频率中等。" },
+      { id: "I1", score: -1, label: "大多数时间在听，只有被问到才会表达观点。" },
+      { id: "I2", score: -2, label: "全程观察，心里有想法但觉得说出来太麻烦。" },
+    ],
+  },
+  {
+    id: "perception_1",
+    dimension: "SN",
+    prompt: "朋友给你看一张他拍的日落照片，你的第一反应是？",
+    options: [
+      { id: "S2", score: 2, label: "这晚霞的橘红色和紫色渐变好美，在哪里拍的？" },
+      { id: "S1", score: 1, label: "云层的纹理很清晰，这手机像素不错啊。" },
+      { id: "N1", score: -1, label: "这让我想起那句‘夕阳无限好，只是近黄昏’。" },
+      { id: "N2", score: -2, label: "你说几千年前的人看到的是不是同一颗太阳？" },
+    ],
+  },
+  {
+    id: "perception_2",
+    dimension: "SN",
+    prompt: "你在安装一个宜家家具，说明书丢了，你会？",
+    options: [
+      { id: "S2", score: 2, label: "耐心对照剩下的图纸碎片，一颗螺丝一颗螺丝地试。" },
+      { id: "S1", score: 1, label: "上网搜同款安装视频，跟着一步步做。" },
+      { id: "N1", score: -1, label: "凭感觉拼，觉得大概就是这样，拼错了再拆。" },
+      { id: "N2", score: -2, label: "直接按自己的空间想象力重新设计组装顺序。" },
+    ],
+  },
+  {
+    id: "perception_3",
+    dimension: "SN",
+    prompt: "当你读一篇科普文章时，你更容易被什么吸引？",
+    options: [
+      { id: "S2", score: 2, label: "具体数据，比如这种鸟每分钟扇动翅膀 80 次。" },
+      { id: "S1", score: 1, label: "操作步骤，比如实验分为三个阶段。" },
+      { id: "N1", score: -1, label: "核心原理，比如这个现象的本质是什么。" },
+      { id: "N2", score: -2, label: "未来影响，比如技术成熟后人类能抵达哪里。" },
+    ],
+  },
+  {
+    id: "perception_4",
+    dimension: "SN",
+    prompt: "你在旅行中迷路了，你会优先依赖？",
+    options: [
+      { id: "S2", score: 2, label: "路牌、门牌号和地标建筑这些肉眼可见的信息。" },
+      { id: "S1", score: 1, label: "地图 App 里清晰的街道名称和距离数据。" },
+      { id: "N1", score: -1, label: "回忆刚才走过的路线，在脑子里画空间方位图。" },
+      { id: "N2", score: -2, label: "凭直觉走，说不定会有意外发现。" },
+    ],
+  },
+  {
+    id: "decision_1",
+    dimension: "TF",
+    prompt: "同事因工作失误被领导当众批评，散会后躲在楼梯间哭。你会？",
+    options: [
+      { id: "T2", score: 2, label: "直接说这次流程确实有问题，我们复盘下次怎么避免。" },
+      { id: "T1", score: 1, label: "递一张纸巾，帮他看看哪一步出了问题。" },
+      { id: "F1", score: -1, label: "坐在他旁边不说话，等他平静后再轻声安慰。" },
+      { id: "F2", score: -2, label: "抱抱他，告诉他努力我都看到了。" },
+    ],
+  },
+  {
+    id: "decision_2",
+    dimension: "TF",
+    prompt: "你要买一台新笔记本电脑，你的决策过程是？",
+    options: [
+      { id: "T2", score: 2, label: "列对比表，比较 CPU、内存、价格与售后，选性价比最高的。" },
+      { id: "T1", score: 1, label: "看测评和参数，选综合评分高的，也考虑颜色。" },
+      { id: "F1", score: -1, label: "先看颜值和手感，如果好看，参数差不多就行。" },
+      { id: "F2", score: -2, label: "直接选那个让我有感觉的，相信直觉和品味。" },
+    ],
+  },
+  {
+    id: "decision_3",
+    dimension: "TF",
+    prompt: "团队项目中有成员进度严重滞后，导致全员要加班。你会？",
+    options: [
+      { id: "T2", score: 2, label: "直接对进度表，用事实指出延误并要求补救时间点。" },
+      { id: "T1", score: 1, label: "客观讨论原因，但语气会缓和，给他留面子。" },
+      { id: "F1", score: -1, label: "内心不满但不好意思说太重，帮他分担一部分。" },
+      { id: "F2", score: -2, label: "先关心他是不是遇到了什么个人问题。" },
+    ],
+  },
+  {
+    id: "decision_4",
+    dimension: "TF",
+    prompt: "你在看一部争议很大的电影，评分两极分化。你更倾向于？",
+    options: [
+      { id: "T2", score: 2, label: "分析镜头语言、剧本结构和叙事逻辑，再给出分数。" },
+      { id: "T1", score: 1, label: "参考评分，也想想它为什么会引起争议。" },
+      { id: "F1", score: -1, label: "完全跟着感觉走，感动到了就是好片。" },
+      { id: "F2", score: -2, label: "只要主角让我共情，其他缺陷都可以忽略。" },
+    ],
+  },
+  {
+    id: "rhythm_1",
+    dimension: "JP",
+    prompt: "你的手机桌面和 App 分类方式是？",
+    options: [
+      { id: "J2", score: 2, label: "按颜色和功能严格分文件夹，未读红点都不能有。" },
+      { id: "J1", score: 1, label: "大概分几个文件夹，不追求完美。" },
+      { id: "P1", score: -1, label: "所有 App 随意散落，靠记忆找。" },
+      { id: "P2", score: -2, label: "桌面是动态的，今天常用的放前面，明天可能全换。" },
+    ],
+  },
+  {
+    id: "rhythm_2",
+    dimension: "JP",
+    prompt: "你答应朋友“下周聚一聚”，通常会？",
+    options: [
+      { id: "J2", score: 2, label: "当场定下下周五晚上 7 点和地点。" },
+      { id: "J1", score: 1, label: "过两天发消息，约一个具体时间。" },
+      { id: "P1", score: -1, label: "快到下周了再问这两天哪天有空。" },
+      { id: "P2", score: -2, label: "完全随缘，到了那天临时问现在有空吗。" },
+    ],
+  },
+  {
+    id: "rhythm_3",
+    dimension: "JP",
+    prompt: "你开始做一个新项目时，第一反应是？",
+    options: [
+      { id: "J2", score: 2, label: "先做计划表，把阶段与时间节点全部标好。" },
+      { id: "J1", score: 1, label: "有个大概框架，但细节边走边看。" },
+      { id: "P1", score: -1, label: "先动手做起来再说，计划赶不上变化。" },
+      { id: "P2", score: -2, label: "不需要计划，灵感来了就猛干，没灵感就停。" },
+    ],
+  },
+  {
+    id: "rhythm_4",
+    dimension: "JP",
+    prompt: "你的衣柜通常是哪种状态？",
+    options: [
+      { id: "J2", score: 2, label: "按季节、颜色、类型严格排列，三秒能拿到衣服。" },
+      { id: "J1", score: 1, label: "大致整齐，换季时会整理一次。" },
+      { id: "P1", score: -1, label: "大部分时间比较乱，偶尔会大整理一次。" },
+      { id: "P2", score: -2, label: "没有整理这个概念，椅子背上挂满衣服是常态。" },
+    ],
+  },
+];
