@@ -1,0 +1,26 @@
+name: 体验提案
+description: 提出新的居民、夜班、探索机制或产品体验建议。
+title: '[Proposal] '
+labels: ['enhancement']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决的体验问题
+      description: 用户在哪一个时刻会失去兴趣或产生困惑？
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 提案
+      description: 描述玩法、世界规则或界面变化。
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: 安全与内容边界
+      description: 说明提案如何避免对真实人物的评价、羞辱或诊断。
+    validations:
+      required: true
