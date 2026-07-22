@@ -133,6 +133,7 @@ legend { color: #dfe8d7; font-size: 14px; margin-bottom: 9px; }
 .deep-report-button { width: 100%; min-height: 40px; margin-top: 12px; border: 1px solid rgba(216, 174, 146, .54); color: #ead4c0; background: rgba(46, 23, 19, .54); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; font-size: 12px; letter-spacing: .06em; }
 .night-shift-button { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(192, 221, 153, .56); color: #e4f0d5; background: rgba(23, 40, 27, .75); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; font-size: 12px; letter-spacing: .06em; }
 .expedition-button { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(226, 181, 127, .58); color: #f1d7b7; background: rgba(57, 31, 20, .7); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; font-size: 12px; letter-spacing: .06em; }
+.rogue-button { width: 100%; min-height: 40px; margin-top: 8px; border: 1px solid rgba(201, 128, 115, .62); color: #f1c5b7; background: rgba(65, 24, 23, .78); display: inline-flex; align-items: center; justify-content: center; gap: 7px; cursor: pointer; font-size: 12px; letter-spacing: .06em; }
 dl { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 14px 0; }
 dl div { padding-top: 8px; border-top: 1px solid rgba(225, 232, 212, .23); }
 dt { color: #a6b59d; font-size: 11px; }
@@ -337,6 +338,47 @@ dd { margin: 4px 0 0; color: #e1e4de; font-size: 12px; line-height: 1.45; }
 .expedition-log p { margin: 4px 0; color: #c5cdc2; font-size: 11px; line-height: 1.55; }
 .expedition-log em { color: #d7bd9d; font-size: 10px; font-style: normal; }
 
+.rogue-shade { background: linear-gradient(180deg, rgba(3, 6, 7, .18) 0%, rgba(13, 7, 8, .58) 42%, rgba(8, 8, 9, .97) 100%); }
+.rogue-card { position: absolute; top: 118px; right: 16px; bottom: 18px; left: 16px; z-index: 3; overflow-y: auto; scrollbar-width: none; padding: 20px 18px 24px; border: 1px solid rgba(215, 166, 145, .46); background: rgba(14, 13, 14, .94); box-shadow: 0 18px 40px rgba(0, 0, 0, .58); }
+.rogue-card::-webkit-scrollbar { display: none; }
+.rogue-card .eyebrow { color: #e2ac98; }
+.rogue-card h2 { margin: 10px 0 8px; color: #f0ebe6; font-size: 25px; line-height: 1.28; letter-spacing: .04em; }
+.rogue-card > p { margin: 0; color: #d6d3cf; font-size: 13px; line-height: 1.7; }
+.rogue-projection { display: grid; gap: 5px; margin: 16px 0; padding: 11px; border-left: 2px solid rgba(226, 158, 136, .73); background: rgba(65, 30, 28, .45); }
+.rogue-projection > span { color: #e3b39f; font-size: 10px; letter-spacing: .1em; }
+.rogue-projection strong { color: #f1e0d5; font-size: 13px; }
+.rogue-projection p { margin: 0; color: #c9c1ba; font-size: 10px; line-height: 1.45; }
+.rogue-rule-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin: 18px 0; }
+.rogue-rule-grid span { padding: 9px 6px; border: 1px solid rgba(218, 198, 181, .24); background: rgba(38, 26, 27, .62); color: #e0ddd6; font-size: 10px; text-align: center; line-height: 1.35; }
+.rogue-map { position: absolute; top: 96px; right: 21px; left: 21px; z-index: 4; display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; }
+.rogue-map::before { position: absolute; top: 14px; right: 13%; left: 13%; z-index: -1; height: 1px; background: rgba(225, 172, 152, .46); content: ""; }
+.rogue-map span { display: grid; place-items: center; width: 29px; height: 29px; margin-inline: auto; border: 1px solid rgba(230, 210, 198, .42); border-radius: 50%; background: rgba(15, 13, 14, .9); color: #b4aaa6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; }
+.rogue-map span.complete { border-color: #dfaa91; background: #dfaa91; color: #2a1716; }
+.rogue-map span.active { border-color: #f0c2ae; color: #f6d2c3; box-shadow: 0 0 0 4px rgba(192, 83, 72, .18), 0 0 12px rgba(235, 147, 126, .28); }
+.rogue-map span.locked { opacity: .5; }
+.rogue-play-card { top: 142px; }
+.rogue-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-bottom: 13px; }
+.rogue-stat-grid > div { min-height: 57px; padding: 8px 5px; border: 1px solid rgba(224, 196, 180, .24); background: rgba(39, 25, 27, .72); text-align: center; }
+.rogue-stat-grid span, .rogue-stat-grid strong { display: block; }
+.rogue-stat-grid span { color: #c0b8b2; font-size: 10px; line-height: 1.25; }
+.rogue-stat-grid strong { margin-top: 4px; color: #f2e7df; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 15px; }
+.rogue-relics { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: -2px 0 13px; }
+.rogue-relics > span { width: 100%; color: #e3b19d; font-size: 10px; letter-spacing: .08em; }
+.rogue-relics em { padding: 4px 6px; border: 1px solid rgba(229, 170, 145, .34); color: #ecd0c0; background: rgba(74, 33, 31, .54); font-size: 10px; font-style: normal; }
+.rogue-enemy-tag { border-color: rgba(225, 145, 124, .58); color: #f0c1af; background: rgba(75, 28, 27, .8); }
+.rogue-enemy-name { margin: 9px 0 -3px !important; color: #f0e6df !important; font-size: 22px !important; }
+.rogue-action-grid, .rogue-reward-grid { display: grid; gap: 8px; }
+.rogue-action-grid button, .rogue-reward-grid button { min-height: 52px; padding: 10px 11px; border: 1px solid rgba(220, 177, 158, .46); color: #e9e7df; background: rgba(54, 28, 29, .76); display: grid; grid-template-columns: 1fr auto; gap: 3px 8px; align-items: center; cursor: pointer; text-align: left; }
+.rogue-action-grid button strong, .rogue-reward-grid button strong { color: #f0e6df; font-size: 13px; }
+.rogue-action-grid button small, .rogue-reward-grid button small { color: #c4beb7; font-size: 10px; line-height: 1.42; }
+.rogue-action-grid button small, .rogue-reward-grid button small { grid-column: 1 / 2; }
+.rogue-action-grid button:hover, .rogue-action-grid button:focus-visible, .rogue-reward-grid button:hover, .rogue-reward-grid button:focus-visible { border-color: #f3c9b8; background: rgba(91, 42, 40, .82); outline: none; }
+.rogue-action-grid button:disabled { cursor: not-allowed; border-color: rgba(179, 168, 161, .24); color: #9f9893; background: rgba(35, 29, 30, .62); }
+.rogue-ending-tag.lost { border-color: rgba(220, 130, 116, .68); color: #f1b8aa; background: rgba(82, 28, 27, .83); }
+.rogue-log { display: grid; gap: 7px; margin: 14px 0; padding: 0; list-style: none; }
+.rogue-log li { padding: 9px; border-left: 2px solid rgba(219, 165, 143, .58); background: rgba(47, 28, 29, .52); color: #ccc9c4; font-size: 11px; line-height: 1.52; }
+.rogue-last-log { margin: 14px 0 0 !important; padding: 9px 10px; border-left: 2px solid rgba(215, 182, 151, .5); background: rgba(43, 31, 26, .46); color: #cfc9c2 !important; font-size: 11px !important; line-height: 1.55 !important; }
+
 .modal-backdrop { position: absolute; inset: 0; z-index: 30; background: rgba(0, 0, 0, .72); display: flex; align-items: flex-end; }
 .info-sheet { width: 100%; padding: 24px 21px 28px; background: #111917; border-top: 1px solid rgba(220, 234, 199, .55); }
 .info-sheet h2 { margin: 10px 0; font-size: 24px; line-height: 1.3; }
@@ -352,4 +394,7 @@ dd { margin: 4px 0 0; color: #e1e4de; font-size: 12px; line-height: 1.45; }
   .expedition-card { top: 102px; right: 12px; bottom: 10px; left: 12px; padding: 17px 14px 20px; }
   .expedition-play-card { top: 130px; }
   .expedition-map { top: 87px; }
+  .rogue-card { top: 102px; right: 12px; bottom: 10px; left: 12px; padding: 17px 14px 20px; }
+  .rogue-play-card { top: 130px; }
+  .rogue-map { top: 87px; }
 }
