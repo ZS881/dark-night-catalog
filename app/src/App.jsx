@@ -20,6 +20,13 @@ import { mbtiNarrativeProfiles } from "./mbtiNarratives";
 import { nightChapters, resolveNightEnding, resolveNightStagePrompt } from "./nightChapters";
 import { mbtiQuestions } from "./mbtiQuestions";
 import { getWorldArtifact, worldArchiveData } from "./worldArchive";
+import {
+  applyExpeditionChoice,
+  createExpeditionRun,
+  expeditionNodes,
+  expeditionTitle,
+  resolveExpeditionEnding,
+} from "./expeditionChapter";
 
 const portableAssetUrl = (path) =>
   path.startsWith("/assets/")
@@ -256,6 +263,7 @@ export function App() {
   const [mbtiAnswers, setMbtiAnswers] = useState(emptyMbtiAnswers);
   const [mbtiScores, setMbtiScores] = useState(emptyMbtiScores);
   const [nightChoices, setNightChoices] = useState([]);
+  const [expeditionRun, setExpeditionRun] = useState(null);
   const [worldlineArchive, setWorldlineArchive] = useState(loadWorldlineArchive);
   const [resonanceEntry, setResonanceEntry] = useState(null);
   const [linkedNightType, setLinkedNightType] = useState("");
@@ -283,6 +291,10 @@ export function App() {
     : [];
   const nightSceneImage = portableAssetUrl(activeNightChapter?.sceneImage ?? selectedResident.image);
   const currentArtifact = activeNightEnding ? getWorldArtifact(activeRoleplayType, activeNightEnding.status) : null;
+  const activeExpeditionNode = expeditionRun ? expeditionNodes[expeditionRun.history.length] ?? null : null;
+  const expeditionEnding = expeditionRun && expeditionRun.history.length === expeditionNodes.length
+    ? resolveExpeditionEnding(expeditionRun)
+    : null;
   const resonanceTarget = resonanceEntry ? mbtiDossierByType[resonanceEntry.target] : null;
   const visualProfileComplete = ["contour", "gaze", "atmosphere"].every((feature) => Boolean(visualProfile[feature]));
   const visualProfileSummary = visualProfileComplete
@@ -389,6 +401,28 @@ export function App() {
     setScreen("nightShift");
   };
 
+  const openExpeditionBriefing = () => {
+    if (resultSource !== "mbti") return;
+    setLinkedNightType("");
+    setExpeditionRun(null);
+    setScreen("expeditionBriefing");
+  };
+
+  const startExpedition = () => {
+    setExpeditionRun(createExpeditionRun(mbtiType));
+    setScreen("expedition");
+  };
+
+  const chooseExpeditionPath = (choice) => {
+    if (!expeditionRun || !activeExpeditionNode || expeditionEnding) return;
+    setExpeditionRun((current) => applyExpeditionChoice(current, activeExpeditionNode, choice));
+  };
+
+  const replayExpedition = () => {
+    setExpeditionRun(createExpeditionRun(mbtiType));
+    setScreen("expedition");
+  };
+
   const chooseNightPath = (choiceId) => {
     if (!activeNightChapter || !activeNightStage || activeNightEnding) return;
     setNightChoices((current) => [...current, choiceId]);
@@ -434,6 +468,7 @@ export function App() {
     setLinkedNightType(entry.target);
     setResultSource("mbti");
     setNightChoices([]);
+    setExpeditionRun(null);
     setScreen("nightShift");
   };
 
@@ -745,6 +780,9 @@ export function App() {
                     <Sparkle size={16} weight="fill" /> 进入{selectedResident.name}的第一夜
                   </button>
                 )}
+                <button className="expedition-button" onClick={openExpeditionBriefing}>
+                  <MapPin size={16} weight="fill" /> 进入雾港远征 · 生存试玩
+                </button>
               </section>
             )}
             <dl>
@@ -835,6 +873,93 @@ export function App() {
             <button className="worldline-button" onClick={saveWorldline}><Archive size={19} weight="duotone" /> 收入世界线档案馆</button>
             <button className="primary-button" onClick={linkedNightType ? openWorldlineArchive : returnToRecord}><Archive size={19} weight="duotone" /> {linkedNightType ? "返回世界线档案馆" : "返回人物图鉴"}</button>
             <button className="quiet-button" onClick={beginNightShift}>重新游玩这一夜 <CaretRight size={16} weight="bold" /></button>
+          </article>
+        </section>
+      )}
+
+      {screen === "expeditionBriefing" && resultSource === "mbti" && (
+        <section className="screen expedition-screen expedition-briefing-screen">
+          <img className="night-scene-image" src={portableAssetUrl(selectedResident.image)} alt="雾港末班车远征入口" />
+          <div className="night-scene-shade expedition-shade" />
+          <div className="night-header">
+            <button className="back-control night-back" onClick={returnToRecord}><ArrowLeft size={20} /> 返回图鉴</button>
+            <span>彼界生存试行协议</span>
+            <span>单人 · 本地记录</span>
+          </div>
+          <article className="expedition-card">
+            <span className="eyebrow"><MapPin size={15} weight="fill" /> 异界轮班远征 · 第一章</span>
+            <h2>{expeditionTitle}</h2>
+            <p>你将以「{mbtiType} · {selectedResident.name}」的虚构夜班投影进入雾港。连续穿过四个节点，管理体力、清醒与异化，并把能被追溯的证物带回晨车。</p>
+            <div className="expedition-boundary"><ShieldCheck size={16} weight="fill" /> 这里的能力仅是问卷驱动的虚构叙事技法，不评价、诊断或定义现实中的你。</div>
+            <section className="expedition-gift-list" aria-label="本次远征的夜班技法">
+              <span>本次夜班技法</span>
+              {createExpeditionRun(mbtiType).gifts.map((gift) => (
+                <div key={gift.label}><strong>{gift.label}</strong><p>{gift.detail}</p></div>
+              ))}
+            </section>
+            <div className="expedition-brief-stats">
+              <span>体力 3</span><span>清醒 3</span><span>异化 0</span>
+            </div>
+            <button className="night-primary-action" onClick={startExpedition}>领取夜班牌，进入雾港 <CaretRight size={18} weight="bold" /></button>
+          </article>
+        </section>
+      )}
+
+      {screen === "expedition" && expeditionRun && (
+        <section className="screen expedition-screen">
+          <img className="night-scene-image" src={portableAssetUrl(selectedResident.image)} alt="雾港末班车夜间远征" />
+          <div className="night-scene-shade expedition-shade" />
+          <div className="night-header">
+            <button className="back-control night-back" onClick={returnToRecord}><ArrowLeft size={20} /> 暂离远征</button>
+            <span>{expeditionTitle}</span>
+            <span>{expeditionEnding ? expeditionEnding.status : `${expeditionRun.history.length + 1} / ${expeditionNodes.length}`}</span>
+          </div>
+          <div className="expedition-map" aria-label="雾港远征地图">
+            {expeditionNodes.map((node, index) => (
+              <span
+                className={index < expeditionRun.history.length ? "complete" : index === expeditionRun.history.length ? "active" : "locked"}
+                key={node.id}
+                title={node.title}
+              >{index + 1}</span>
+            ))}
+          </div>
+          <article className="expedition-card expedition-play-card">
+            <div className="expedition-stat-grid" aria-label="远征状态">
+              <div><span>体力</span><strong>{expeditionRun.stamina}/5</strong></div>
+              <div><span>清醒</span><strong>{expeditionRun.clarity}/5</strong></div>
+              <div className={expeditionRun.drift >= 3 ? "danger" : ""}><span>异化</span><strong>{expeditionRun.drift}/5</strong></div>
+              <div><span>归还印记</span><strong>{expeditionRun.seals}</strong></div>
+            </div>
+            {expeditionRun.supplies.length > 0 && <div className="expedition-supplies"><span>携带证物</span>{expeditionRun.supplies.map((supply) => <em key={supply}>{supply}</em>)}</div>}
+
+            {!expeditionEnding && activeExpeditionNode ? (
+              <>
+                <span className="speaker-tag">{activeExpeditionNode.location} · {activeExpeditionNode.title}</span>
+                <p className="expedition-prompt">{activeExpeditionNode.prompt}</p>
+                <p className="night-rule"><strong>当前守则：</strong>{activeExpeditionNode.rule}</p>
+                {expeditionRun.history.length > 0 && <div className="night-history expedition-history"><span>已穿过</span>{expeditionRun.history.map((entry) => <em key={entry.nodeId}>{entry.title}</em>)}</div>}
+                <div className="dialogue-choices">
+                  {activeExpeditionNode.choices.map((choice) => (
+                    <button key={choice.id} onClick={() => chooseExpeditionPath(choice)}>
+                      <span><strong>{choice.label}</strong><small>{choice.detail}</small></span>
+                      <CaretRight size={18} weight="bold" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : expeditionEnding ? (
+              <>
+                <span className={`speaker-tag expedition-ending-tag ${expeditionEnding.status === "失联" ? "lost" : ""}`}>{expeditionEnding.title}</span>
+                <p className="expedition-prompt">{expeditionEnding.summary}</p>
+                <p className="night-ending-conclusion">{expeditionEnding.returnNote}</p>
+                <ol className="expedition-log" aria-label="本次远征记录">
+                  {expeditionRun.history.map((entry, index) => (
+                    <li key={entry.nodeId}><span>节点 {index + 1} · {entry.location}</span><strong>{entry.label}</strong><p>{entry.outcome}</p>{entry.triggeredGifts.length > 0 && <em>投影技法触发：{entry.triggeredGifts.join("、")}</em>}</li>
+                  ))}
+                </ol>
+                <button className="night-primary-action" onClick={replayExpedition}>保留线索，重开世界线 <Sparkle size={18} weight="fill" /></button>
+              </>
+            ) : null}
           </article>
         </section>
       )}
