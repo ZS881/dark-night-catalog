@@ -189,6 +189,7 @@ export const applyExpeditionChoice = (run, node, choice) => {
     supplies,
     history: [...run.history, {
       nodeId: node.id,
+      choiceId: choice.id,
       location: node.location,
       title: node.title,
       label: choice.label,
