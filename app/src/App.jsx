@@ -27,6 +27,11 @@ import {
   expeditionTitle,
   resolveExpeditionEnding,
 } from "./expeditionChapter";
+import {
+  buildResonanceParcel,
+  deriveWorldDistricts,
+  parseResonanceCode,
+} from "./resonanceMail";
 
 const portableAssetUrl = (path) =>
   path.startsWith("/assets/")
@@ -216,6 +221,8 @@ const visualFeatureLabels = Object.fromEntries(
   Object.entries(visualFeatureOptions).flatMap(([feature, options]) => options.map((option) => [`${feature}:${option.id}`, option.label])),
 );
 const worldArchiveStorageKey = "dark-night-worldline-archive-v1";
+const expeditionArchiveStorageKey = "dark-night-expedition-archive-v1";
+const resonanceInboxStorageKey = "dark-night-resonance-inbox-v1";
 
 const loadWorldlineArchive = () => {
   if (typeof window === "undefined") return [];
@@ -233,6 +240,25 @@ const persistWorldlineArchive = (records) => {
     window.localStorage.setItem(worldArchiveStorageKey, JSON.stringify(records));
   } catch {
     // The archive is still usable for the current session when storage is unavailable.
+  }
+};
+
+const loadLocalRecords = (storageKey) => {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = window.localStorage.getItem(storageKey);
+    const records = stored ? JSON.parse(stored) : [];
+    return Array.isArray(records) ? records : [];
+  } catch {
+    return [];
+  }
+};
+
+const persistLocalRecords = (storageKey, records) => {
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(records));
+  } catch {
+    // The fictional archive remains available for the current session when storage is unavailable.
   }
 };
 const calculateMbtiResult = (answers) => {
@@ -264,6 +290,11 @@ export function App() {
   const [mbtiScores, setMbtiScores] = useState(emptyMbtiScores);
   const [nightChoices, setNightChoices] = useState([]);
   const [expeditionRun, setExpeditionRun] = useState(null);
+  const [expeditionArchive, setExpeditionArchive] = useState(() => loadLocalRecords(expeditionArchiveStorageKey));
+  const [resonanceInbox, setResonanceInbox] = useState(() => loadLocalRecords(resonanceInboxStorageKey));
+  const [resonanceInput, setResonanceInput] = useState("");
+  const [resonanceMessage, setResonanceMessage] = useState("");
+  const [activeParcel, setActiveParcel] = useState(null);
   const [worldlineArchive, setWorldlineArchive] = useState(loadWorldlineArchive);
   const [resonanceEntry, setResonanceEntry] = useState(null);
   const [linkedNightType, setLinkedNightType] = useState("");
@@ -295,6 +326,8 @@ export function App() {
   const expeditionEnding = expeditionRun && expeditionRun.history.length === expeditionNodes.length
     ? resolveExpeditionEnding(expeditionRun)
     : null;
+  const worldDistricts = deriveWorldDistricts(expeditionArchive, resonanceInbox);
+  const latestExpeditionParcel = activeParcel ?? expeditionArchive[0]?.parcel ?? null;
   const resonanceTarget = resonanceEntry ? mbtiDossierByType[resonanceEntry.target] : null;
   const visualProfileComplete = ["contour", "gaze", "atmosphere"].every((feature) => Boolean(visualProfile[feature]));
   const visualProfileSummary = visualProfileComplete
@@ -423,6 +456,60 @@ export function App() {
     setScreen("expedition");
   };
 
+  const openWorldMap = () => {
+    setResonanceMessage("");
+    setScreen("worldMap");
+  };
+
+  const archiveExpedition = () => {
+    if (!expeditionRun || !expeditionEnding) return;
+    const parcel = buildResonanceParcel(expeditionRun, expeditionEnding);
+    if (!parcel) return;
+    const entry = {
+      id: parcel.code,
+      status: expeditionEnding.status,
+      title: expeditionEnding.title,
+      supplies: expeditionRun.supplies,
+      history: expeditionRun.history,
+      parcel,
+      createdAt: parcel.createdAt,
+    };
+    setExpeditionArchive((current) => {
+      const updated = [entry, ...current.filter((record) => record.id !== entry.id)].slice(0, 24);
+      persistLocalRecords(expeditionArchiveStorageKey, updated);
+      return updated;
+    });
+    setActiveParcel(parcel);
+    setResonanceMessage("远征已归档。残响码只记录虚构路线符号。");
+    setScreen("worldMap");
+  };
+
+  const receiveResonanceParcel = () => {
+    const parcel = parseResonanceCode(resonanceInput);
+    if (!parcel) {
+      setResonanceMessage("无法辨认该残响码。格式示例：WH-R-AABC。");
+      return;
+    }
+    setResonanceInbox((current) => {
+      const updated = [parcel, ...current.filter((entry) => entry.code !== parcel.code)].slice(0, 32);
+      persistLocalRecords(resonanceInboxStorageKey, updated);
+      return updated;
+    });
+    setResonanceInput("");
+    setResonanceMessage("已收到一封来自雾港的虚构来信。地图出现了新的标记。");
+  };
+
+  const copyResonanceCode = async () => {
+    if (!latestExpeditionParcel) return;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard?.writeText(latestExpeditionParcel.code);
+      setResonanceMessage("残响码已复制，可发给朋友导入。");
+    } catch {
+      setResonanceMessage(`请手动复制：${latestExpeditionParcel.code}`);
+    }
+  };
+
   const chooseNightPath = (choiceId) => {
     if (!activeNightChapter || !activeNightStage || activeNightEnding) return;
     setNightChoices((current) => [...current, choiceId]);
@@ -491,6 +578,9 @@ export function App() {
     setNightChoices([]);
     setLinkedNightType("");
     setResonanceEntry(null);
+    setActiveParcel(null);
+    setResonanceInput("");
+    setResonanceMessage("");
     setResultRoute("repair");
     setResultSource("route");
     setSaveState("idle");
@@ -547,7 +637,7 @@ export function App() {
           <img className="scene-image" src={portableAssetUrl("/assets/expressive-bloodline-maintainer.png")} alt="雨夜地铁站内工作的彼界维修员" />
           <div className="scene-shade" />
           <header className="topbar">
-            <button className="icon-button" aria-label="打开世界线档案馆" onClick={openWorldlineArchive}>
+            <button className="icon-button" aria-label="打开雾港世界线地图" onClick={openWorldMap}>
               <MapPin size={22} weight="bold" />
             </button>
             <div className="wordmark">暗夜图鉴相机</div>
@@ -957,6 +1047,7 @@ export function App() {
                     <li key={entry.nodeId}><span>节点 {index + 1} · {entry.location}</span><strong>{entry.label}</strong><p>{entry.outcome}</p>{entry.triggeredGifts.length > 0 && <em>投影技法触发：{entry.triggeredGifts.join("、")}</em>}</li>
                   ))}
                 </ol>
+                <button className="worldline-button" onClick={archiveExpedition}><Archive size={19} weight="duotone" /> 归档远征并封装残响</button>
                 <button className="night-primary-action" onClick={replayExpedition}>保留线索，重开世界线 <Sparkle size={18} weight="fill" /></button>
               </>
             ) : null}
@@ -1028,6 +1119,61 @@ export function App() {
               <p><strong>{selectedResident.name}</strong> 并不是你本人，而是本次选择被写成的平行世界居民。{selectedResident.manifestation}</p>
               <p>{selectedResident.workRhythm}</p>
             </section>
+          </article>
+        </section>
+      )}
+
+      {screen === "worldMap" && (
+        <section className="screen world-map-screen">
+          <img className="background-image" src={portableAssetUrl("/assets/tunnel-atmosphere.png")} alt="雾港线路图所在的潮湿隧道" />
+          <div className="sheet-shade world-map-shade" />
+          <article className="world-map-panel">
+            <button className="back-control" onClick={() => setScreen("observe")}><ArrowLeft size={20} /> 返回观测</button>
+            <span className="eyebrow"><MapPin size={15} weight="fill" /> 雾港世界线地图 · 本地记录</span>
+            <h2>每一次交班，都让雾港多出一条可走的路。</h2>
+            <p>地图只记录虚构远征、证物数量与残响信；不保存照片、用户名、问卷答案或任何现实人格信息。</p>
+            <div className="worldline-stats">
+              <div><strong>{expeditionArchive.length}</strong><span>雾港远征</span></div>
+              <div><strong>{expeditionArchive.filter((entry) => entry.status === "归还").length}</strong><span>归还世界线</span></div>
+              <div><strong>{resonanceInbox.length}</strong><span>收到残响信</span></div>
+            </div>
+
+            <section className="world-district-list" aria-label="雾港已发现区域">
+              <span>线路显影</span>
+              {worldDistricts.map((district) => (
+                <article className={`world-district ${district.unlocked ? "unlocked" : "locked"}`} key={district.id}>
+                  <em>{district.index}</em>
+                  <div><strong>{district.name}</strong><p>{district.unlocked ? district.description : `未显影 · ${district.requirement}`}</p></div>
+                  <span>{district.unlocked ? "已显影" : "雾中"}</span>
+                </article>
+              ))}
+            </section>
+
+            <section className="resonance-mailbox" aria-label="残响邮局">
+              <span>残响邮局 · 朋友导入</span>
+              <p>输入朋友分享的虚构路线码，即可收到一封世界内来信。</p>
+              <div className="resonance-input-row">
+                <input value={resonanceInput} onChange={(event) => setResonanceInput(event.target.value)} placeholder="WH-R-AABC" aria-label="残响码" />
+                <button type="button" onClick={receiveResonanceParcel}>收信</button>
+              </div>
+              {resonanceMessage && <p className="resonance-message" role="status">{resonanceMessage}</p>}
+              {latestExpeditionParcel && (
+                <div className="outbound-parcel">
+                  <span>本机最近封装的残响</span>
+                  <strong>{latestExpeditionParcel.code}</strong>
+                  <p>{latestExpeditionParcel.status} · {latestExpeditionParcel.title}</p>
+                  <button type="button" onClick={copyResonanceCode}>复制给朋友</button>
+                </div>
+              )}
+            </section>
+
+            {resonanceInbox.length > 0 && (
+              <section className="received-mail-list" aria-label="收到的残响来信">
+                <span>已收到的来信</span>
+                {resonanceInbox.slice(0, 3).map((parcel) => <article key={parcel.code}><strong>{parcel.title}</strong><em>{parcel.code}</em><p>{parcel.body}</p></article>)}
+              </section>
+            )}
+            <button className="quiet-button world-map-archive-link" onClick={openWorldlineArchive}><Archive size={17} weight="duotone" /> 查看居民夜班档案馆</button>
           </article>
         </section>
       )}

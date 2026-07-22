@@ -221,6 +221,39 @@ dd { margin: 4px 0 0; color: #e1e4de; font-size: 12px; line-height: 1.45; }
 .ending-path-log em { color: #dcb995; font-size: 10px; font-style: normal; }
 
 .worldline-button { width: 100%; min-height: 48px; margin-bottom: 10px; border: 1px solid rgba(220, 195, 150, .62); color: #f0d6ba; background: rgba(61, 37, 26, .8); display: inline-flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; font-weight: 600; letter-spacing: .05em; }
+.world-map-shade { background: linear-gradient(180deg, rgba(2, 8, 7, .5), rgba(5, 10, 9, .95)); }
+.world-map-panel { position: absolute; top: 54px; right: 17px; bottom: 18px; left: 17px; z-index: 3; overflow: auto; scrollbar-width: none; padding: 21px 18px 24px; border: 1px solid rgba(208, 224, 182, .42); background: rgba(8, 15, 13, .95); box-shadow: 0 16px 36px rgba(0, 0, 0, .54); }
+.world-map-panel::-webkit-scrollbar { display: none; }
+.world-map-panel > .eyebrow { margin-top: 17px; }
+.world-map-panel h2 { margin: 10px 0 8px; color: #e7ecdf; font-size: 24px; line-height: 1.35; letter-spacing: .03em; }
+.world-map-panel > p { margin: 0; color: #c4cec1; font-size: 12px; line-height: 1.68; }
+.world-district-list, .resonance-mailbox, .received-mail-list { display: grid; gap: 9px; margin-top: 17px; }
+.world-district-list > span, .resonance-mailbox > span, .received-mail-list > span { color: #d6bb96; font-size: 10px; letter-spacing: .12em; }
+.world-district { display: grid; grid-template-columns: 30px 1fr auto; gap: 9px; align-items: start; padding: 10px; border: 1px solid rgba(205, 222, 182, .25); background: rgba(20, 32, 25, .64); }
+.world-district em { padding-top: 1px; color: #dce8c8; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 11px; font-style: normal; }
+.world-district strong { display: block; color: #e3eadb; font-size: 13px; }
+.world-district p { margin: 4px 0 0; color: #b7c2b5; font-size: 10px; line-height: 1.5; }
+.world-district > span { padding-top: 2px; color: #c9dcab; font-size: 10px; white-space: nowrap; }
+.world-district.locked { border-style: dashed; border-color: rgba(183, 193, 171, .19); background: rgba(13, 21, 17, .5); opacity: .72; }
+.world-district.locked > span { color: #a9aca5; }
+.resonance-mailbox { padding: 12px; border: 1px solid rgba(221, 192, 155, .34); background: rgba(53, 33, 24, .34); }
+.resonance-mailbox > p { margin: -3px 0 1px; color: #c9c5ba; font-size: 11px; line-height: 1.55; }
+.resonance-input-row { display: grid; grid-template-columns: 1fr auto; gap: 7px; }
+.resonance-input-row input { min-width: 0; border: 1px solid rgba(218, 226, 195, .35); border-radius: 0; background: rgba(4, 10, 8, .72); color: #edf0e6; padding: 9px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; letter-spacing: .06em; }
+.resonance-input-row input:focus { outline: 1px solid #d9eab7; border-color: #d9eab7; }
+.resonance-input-row button, .outbound-parcel button { border: 1px solid rgba(214, 229, 188, .5); color: #e4efd5; background: rgba(31, 54, 37, .78); padding: 0 11px; cursor: pointer; font-size: 11px; }
+.resonance-message { margin: 0 !important; color: #d9dbaf !important; font-size: 10px !important; line-height: 1.45 !important; }
+.outbound-parcel { display: grid; gap: 4px; padding: 10px; border-left: 2px solid rgba(225, 183, 141, .72); background: rgba(18, 28, 21, .62); }
+.outbound-parcel > span { color: #b8c7a7; font-size: 10px; }
+.outbound-parcel strong { color: #f0d7b6; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 14px; letter-spacing: .05em; }
+.outbound-parcel p { margin: 0; color: #c1c9bc; font-size: 10px; line-height: 1.45; }
+.outbound-parcel button { width: max-content; min-height: 31px; margin-top: 3px; padding: 0 9px; }
+.received-mail-list article { padding: 10px; border-left: 2px solid rgba(200, 219, 177, .54); background: rgba(14, 25, 19, .66); }
+.received-mail-list strong, .received-mail-list em { display: block; }
+.received-mail-list strong { color: #e0e8d7; font-size: 12px; }
+.received-mail-list em { margin-top: 4px; color: #d7b995; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10px; font-style: normal; }
+.received-mail-list p { margin: 5px 0 0; color: #b9c4b7; font-size: 10px; line-height: 1.52; }
+.world-map-archive-link { width: 100%; min-height: 40px; margin-top: 17px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
 .world-archive-panel, .resonance-panel { position: absolute; top: 54px; left: 17px; right: 17px; bottom: 18px; z-index: 3; overflow: auto; scrollbar-width: none; padding: 21px 18px 24px; border: 1px solid rgba(214, 226, 195, .38); background: rgba(9, 16, 14, .94); box-shadow: 0 16px 36px rgba(0, 0, 0, .5); }
 .world-archive-panel::-webkit-scrollbar, .resonance-panel::-webkit-scrollbar { display: none; }
 .world-archive-panel > .eyebrow, .resonance-panel > .eyebrow { margin-top: 17px; }
