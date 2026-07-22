@@ -32,6 +32,14 @@ import {
   deriveWorldDistricts,
   parseResonanceCode,
 } from "./resonanceMail";
+import {
+  chooseRogueReward,
+  createFogRogueRun,
+  getActiveRogueEnemy,
+  getRogueProjection,
+  performRogueAction,
+  resolveRogueEnding,
+} from "./fogRogue";
 
 const portableAssetUrl = (path) =>
   path.startsWith("/assets/")
@@ -290,6 +298,7 @@ export function App() {
   const [mbtiScores, setMbtiScores] = useState(emptyMbtiScores);
   const [nightChoices, setNightChoices] = useState([]);
   const [expeditionRun, setExpeditionRun] = useState(null);
+  const [rogueRun, setRogueRun] = useState(null);
   const [expeditionArchive, setExpeditionArchive] = useState(() => loadLocalRecords(expeditionArchiveStorageKey));
   const [resonanceInbox, setResonanceInbox] = useState(() => loadLocalRecords(resonanceInboxStorageKey));
   const [resonanceInput, setResonanceInput] = useState("");
@@ -326,6 +335,9 @@ export function App() {
   const expeditionEnding = expeditionRun && expeditionRun.history.length === expeditionNodes.length
     ? resolveExpeditionEnding(expeditionRun)
     : null;
+  const activeRogueEnemy = getActiveRogueEnemy(rogueRun);
+  const rogueEnding = resolveRogueEnding(rogueRun);
+  const rogueProjection = getRogueProjection(mbtiType);
   const worldDistricts = deriveWorldDistricts(expeditionArchive, resonanceInbox);
   const latestExpeditionParcel = activeParcel ?? expeditionArchive[0]?.parcel ?? null;
   const resonanceTarget = resonanceEntry ? mbtiDossierByType[resonanceEntry.target] : null;
@@ -456,6 +468,31 @@ export function App() {
     setScreen("expedition");
   };
 
+  const openRogueBriefing = () => {
+    if (resultSource !== "mbti") return;
+    setLinkedNightType("");
+    setRogueRun(null);
+    setScreen("rogueBriefing");
+  };
+
+  const startRogueRun = () => {
+    setRogueRun(createFogRogueRun(mbtiType));
+    setScreen("rogue");
+  };
+
+  const takeRogueAction = (action) => {
+    setRogueRun((current) => current ? performRogueAction(current, action) : current);
+  };
+
+  const takeRogueReward = (rewardId) => {
+    setRogueRun((current) => current ? chooseRogueReward(current, rewardId) : current);
+  };
+
+  const replayRogueRun = () => {
+    setRogueRun(createFogRogueRun(mbtiType));
+    setScreen("rogue");
+  };
+
   const openWorldMap = () => {
     setResonanceMessage("");
     setScreen("worldMap");
@@ -555,6 +592,7 @@ export function App() {
     setLinkedNightType(entry.target);
     setResultSource("mbti");
     setNightChoices([]);
+    setRogueRun(null);
     setExpeditionRun(null);
     setScreen("nightShift");
   };
@@ -873,6 +911,9 @@ export function App() {
                 <button className="expedition-button" onClick={openExpeditionBriefing}>
                   <MapPin size={16} weight="fill" /> 进入雾港远征 · 生存试玩
                 </button>
+                <button className="rogue-button" onClick={openRogueBriefing}>
+                  <Crosshair size={16} weight="bold" /> 雾港清障 · 肉鸽试行
+                </button>
               </section>
             )}
             <dl>
@@ -1051,6 +1092,90 @@ export function App() {
                 <button className="night-primary-action" onClick={replayExpedition}>保留线索，重开世界线 <Sparkle size={18} weight="fill" /></button>
               </>
             ) : null}
+          </article>
+        </section>
+      )}
+
+      {screen === "rogueBriefing" && resultSource === "mbti" && (
+        <section className="screen rogue-screen rogue-briefing-screen">
+          <img className="night-scene-image" src={portableAssetUrl(selectedResident.image)} alt={`${selectedResident.name}的雾港清障入口`} />
+          <div className="night-scene-shade rogue-shade" />
+          <div className="night-header">
+            <button className="back-control night-back" onClick={returnToRecord}><ArrowLeft size={20} /> 返回图鉴</button>
+            <span>雾港清障试行协议</span>
+            <span>单人 · 可重复世界线</span>
+          </div>
+          <article className="rogue-card">
+            <span className="eyebrow"><Crosshair size={15} weight="bold" /> 肉鸽清障 · 第一批次</span>
+            <h2>把这名居民送进会反击的雾里。</h2>
+            <p>本局主角是「{mbtiType} · {selectedResident.name}」这名虚构彼界居民，而不是现实中的你。每次进入都会抽取不同的异常序列与证物，失败只会中断本条虚构世界线。</p>
+            <div className="expedition-boundary"><ShieldCheck size={16} weight="fill" /> 问卷只决定叙事投影的起始技法；它不代表现实中的能力、性格强度或对抗倾向。</div>
+            <section className="rogue-projection">
+              <span>本局清障投影</span>
+              <strong>{rogueProjection.label}</strong>
+              {rogueProjection.perks.map((perk) => <p key={perk}>{perk}</p>)}
+            </section>
+            <div className="rogue-rule-grid"><span>4 个随机节点</span><span>击退后 3 选 1</span><span>失败可立即重开</span></div>
+            <button className="night-primary-action" onClick={startRogueRun}>领取清障牌，进入雾港 <CaretRight size={18} weight="bold" /></button>
+          </article>
+        </section>
+      )}
+
+      {screen === "rogue" && rogueRun && (
+        <section className="screen rogue-screen">
+          <img className="night-scene-image" src={portableAssetUrl(selectedResident.image)} alt={`${selectedResident.name}正在雾港清障`} />
+          <div className="night-scene-shade rogue-shade" />
+          <div className="night-header">
+            <button className="back-control night-back" onClick={returnToRecord}><ArrowLeft size={20} /> 暂离清障</button>
+            <span>雾港清障 · {mbtiType}</span>
+            <span>{rogueEnding ? "交班结算" : `${rogueRun.floor + 1} / ${rogueRun.enemyPath.length}`}</span>
+          </div>
+          <div className="rogue-map" aria-label="雾港清障节点">
+            {rogueRun.enemyPath.map((enemy, index) => <span className={index < rogueRun.floor ? "complete" : index === rogueRun.floor && !rogueEnding ? "active" : "locked"} key={enemy.id}>{index + 1}</span>)}
+          </div>
+          <article className="rogue-card rogue-play-card">
+            <div className="rogue-stat-grid" aria-label="清障状态">
+              <div><span>状态</span><strong>{rogueRun.hp}/{rogueRun.maxHp}</strong></div>
+              <div><span>专注</span><strong>{rogueRun.focus}/5</strong></div>
+              <div><span>护持</span><strong>{rogueRun.ward}</strong></div>
+              <div><span>证物</span><strong>{rogueRun.relics.length}</strong></div>
+            </div>
+            {rogueRun.relics.length > 0 && <div className="rogue-relics"><span>已装配证物</span>{rogueRun.relics.map((relic) => <em key={relic.id}>{relic.label}</em>)}</div>}
+
+            {rogueRun.phase === "battle" && activeRogueEnemy && (
+              <>
+                <span className="speaker-tag rogue-enemy-tag">{activeRogueEnemy.title} · 异常完整度 {activeRogueEnemy.currentHp}/{activeRogueEnemy.hp}</span>
+                <h2 className="rogue-enemy-name">{activeRogueEnemy.name}</h2>
+                <p className="expedition-prompt">{activeRogueEnemy.note}</p>
+                <div className="rogue-action-grid">
+                  <button onClick={() => takeRogueAction("strike")}><strong>清障压制</strong><small>直接压低异常完整度；专注达到 4 时伤害提高。</small></button>
+                  <button onClick={() => takeRogueAction("inspect")}><strong>观察回声</strong><small>记录该异常，并积累专注与护持。</small></button>
+                  <button disabled={rogueRun.focus === 0} onClick={() => takeRogueAction("seal")}><strong>展开封存线</strong><small>{rogueRun.focus === 0 ? "专注不足，暂时无法封存。" : "消耗 1 点专注，抵御下一次反扑。"}</small></button>
+                </div>
+              </>
+            )}
+
+            {rogueRun.phase === "reward" && (
+              <>
+                <span className="speaker-tag">节点清理完成 · 选择一份证物</span>
+                <p className="expedition-prompt">异常被写回站务系统，但下一段雾已经漫过来。只能带走一件能改变本局规则的证物。</p>
+                <div className="rogue-reward-grid">
+                  {rogueRun.offer.map((reward) => <button key={reward.id} onClick={() => takeRogueReward(reward.id)}><strong>{reward.label}</strong><small>{reward.description}</small><CaretRight size={16} weight="bold" /></button>)}
+                </div>
+              </>
+            )}
+
+            {rogueEnding && (
+              <>
+                <span className={`speaker-tag rogue-ending-tag ${rogueRun.phase === "lost" ? "lost" : ""}`}>{rogueEnding.title}</span>
+                <p className="expedition-prompt">{rogueEnding.text}</p>
+                <ol className="rogue-log" aria-label="本局清障记录">
+                  {rogueRun.history.slice(-6).map((entry, index) => <li key={`${entry.kind}-${index}`}>{entry.text}</li>)}
+                </ol>
+                <button className="night-primary-action" onClick={replayRogueRun}>保留居民投影，重开清障线 <Sparkle size={18} weight="fill" /></button>
+              </>
+            )}
+            {!rogueEnding && rogueRun.history.length > 1 && <p className="rogue-last-log">{rogueRun.history.at(-1).text}</p>}
           </article>
         </section>
       )}
