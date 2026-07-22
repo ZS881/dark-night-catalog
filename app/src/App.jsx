@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Archive,
   ArrowLeft,
@@ -33,18 +33,25 @@ import {
   parseResonanceCode,
 } from "./resonanceMail";
 import {
-  chooseRogueReward,
-  createFogRogueRun,
-  getActiveRogueEnemy,
-  getRogueProjection,
-  performRogueAction,
-  resolveRogueEnding,
-} from "./fogRogue";
+  advanceArenaRun,
+  arenaSize,
+  arenaWeapons,
+  buyArenaShopItem,
+  chooseArenaEvent,
+  chooseArenaUpgrade,
+  createArenaRun,
+  drawArena,
+  getArenaProjection,
+  getArenaResult,
+  leaveArenaShop,
+} from "./fogRogueArena";
 
 const portableAssetUrl = (path) =>
   path.startsWith("/assets/")
     ? `${import.meta.env.BASE_URL}assets/${path.slice("/assets/".length)}`
     : path;
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 const residents = {
   repair: {
@@ -231,6 +238,7 @@ const visualFeatureLabels = Object.fromEntries(
 const worldArchiveStorageKey = "dark-night-worldline-archive-v1";
 const expeditionArchiveStorageKey = "dark-night-expedition-archive-v1";
 const resonanceInboxStorageKey = "dark-night-resonance-inbox-v1";
+const rogueMetaStorageKey = "dark-night-fog-rogue-meta-v1";
 
 const loadWorldlineArchive = () => {
   if (typeof window === "undefined") return [];
@@ -269,6 +277,26 @@ const persistLocalRecords = (storageKey, records) => {
     // The fictional archive remains available for the current session when storage is unavailable.
   }
 };
+
+const loadRogueMeta = () => {
+  if (typeof window === "undefined") return { embers: 0, runs: 0, clears: 0 };
+  try {
+    const stored = JSON.parse(window.localStorage.getItem(rogueMetaStorageKey) ?? "null");
+    return stored && typeof stored === "object"
+      ? { embers: Number(stored.embers) || 0, runs: Number(stored.runs) || 0, clears: Number(stored.clears) || 0 }
+      : { embers: 0, runs: 0, clears: 0 };
+  } catch {
+    return { embers: 0, runs: 0, clears: 0 };
+  }
+};
+
+const persistRogueMeta = (meta) => {
+  try {
+    window.localStorage.setItem(rogueMetaStorageKey, JSON.stringify(meta));
+  } catch {
+    // Meta progress remains available for the current play session if storage is unavailable.
+  }
+};
 const calculateMbtiResult = (answers) => {
   const scores = { ...emptyMbtiScores };
 
@@ -299,6 +327,10 @@ export function App() {
   const [nightChoices, setNightChoices] = useState([]);
   const [expeditionRun, setExpeditionRun] = useState(null);
   const [rogueRun, setRogueRun] = useState(null);
+  const [rogueWeapon, setRogueWeapon] = useState("pulsePistol");
+  const [rogueMeta, setRogueMeta] = useState(loadRogueMeta);
+  const [arenaPaused, setArenaPaused] = useState(false);
+  const [arenaPanelOpen, setArenaPanelOpen] = useState(false);
   const [expeditionArchive, setExpeditionArchive] = useState(() => loadLocalRecords(expeditionArchiveStorageKey));
   const [resonanceInbox, setResonanceInbox] = useState(() => loadLocalRecords(resonanceInboxStorageKey));
   const [resonanceInput, setResonanceInput] = useState("");
@@ -314,6 +346,10 @@ export function App() {
   const [infoOpen, setInfoOpen] = useState(false);
   const [saveState, setSaveState] = useState("idle");
   const fileInput = useRef(null);
+  const arenaCanvas = useRef(null);
+  const rogueControls = useRef({ up: false, down: false, left: false, right: false, dash: false });
+  const rogueAim = useRef({ x: arenaSize.width / 2, y: arenaSize.height / 2 });
+  const creditedRogueRun = useRef(null);
   const activeRoleplayType = linkedNightType || mbtiType;
   const selectedResident = resultSource === "mbti"
     ? { ...mbtiDossierByType[activeRoleplayType], ...mbtiNarrativeProfiles[activeRoleplayType] }
@@ -335,9 +371,8 @@ export function App() {
   const expeditionEnding = expeditionRun && expeditionRun.history.length === expeditionNodes.length
     ? resolveExpeditionEnding(expeditionRun)
     : null;
-  const activeRogueEnemy = getActiveRogueEnemy(rogueRun);
-  const rogueEnding = resolveRogueEnding(rogueRun);
-  const rogueProjection = getRogueProjection(mbtiType);
+  const rogueEnding = getArenaResult(rogueRun);
+  const rogueProjection = getArenaProjection(mbtiType);
   const worldDistricts = deriveWorldDistricts(expeditionArchive, resonanceInbox);
   const latestExpeditionParcel = activeParcel ?? expeditionArchive[0]?.parcel ?? null;
   const resonanceTarget = resonanceEntry ? mbtiDossierByType[resonanceEntry.target] : null;
@@ -472,25 +507,55 @@ export function App() {
     if (resultSource !== "mbti") return;
     setLinkedNightType("");
     setRogueRun(null);
+    setArenaPaused(false);
+    setArenaPanelOpen(false);
     setScreen("rogueBriefing");
   };
 
   const startRogueRun = () => {
-    setRogueRun(createFogRogueRun(mbtiType));
-    setScreen("rogue");
+    creditedRogueRun.current = null;
+    rogueControls.current = { up: false, down: false, left: false, right: false, dash: false };
+    rogueAim.current = { x: arenaSize.width / 2, y: arenaSize.height / 2 };
+    setArenaPaused(false);
+    setArenaPanelOpen(false);
+    setRogueRun(createArenaRun(mbtiType, rogueWeapon, rogueMeta));
+    setScreen("rogueArena");
   };
 
-  const takeRogueAction = (action) => {
-    setRogueRun((current) => current ? performRogueAction(current, action) : current);
+  const chooseRogueUpgrade = (upgradeId) => {
+    setRogueRun((current) => current ? chooseArenaUpgrade(current, upgradeId) : current);
   };
 
-  const takeRogueReward = (rewardId) => {
-    setRogueRun((current) => current ? chooseRogueReward(current, rewardId) : current);
+  const chooseRogueEvent = (choiceId) => {
+    setRogueRun((current) => current ? chooseArenaEvent(current, choiceId) : current);
+  };
+
+  const buyRogueShopItem = (itemId) => {
+    setRogueRun((current) => current ? buyArenaShopItem(current, itemId) : current);
+  };
+
+  const leaveRogueShop = () => {
+    setRogueRun((current) => current ? leaveArenaShop(current) : current);
   };
 
   const replayRogueRun = () => {
-    setRogueRun(createFogRogueRun(mbtiType));
-    setScreen("rogue");
+    startRogueRun();
+  };
+
+  const setRogueControl = (control, active) => {
+    rogueControls.current = { ...rogueControls.current, [control]: active };
+  };
+
+  const queueRogueDash = () => {
+    rogueControls.current = { ...rogueControls.current, dash: true };
+  };
+
+  const updateRogueAim = (event) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    rogueAim.current = {
+      x: clamp((event.clientX - bounds.left) * arenaSize.width / bounds.width, 0, arenaSize.width),
+      y: clamp((event.clientY - bounds.top) * arenaSize.height / bounds.height, 0, arenaSize.height),
+    };
   };
 
   const openWorldMap = () => {
@@ -599,6 +664,8 @@ export function App() {
 
   const returnToRecord = () => {
     setLinkedNightType("");
+    setArenaPaused(false);
+    setArenaPanelOpen(false);
     setScreen("record");
   };
 
@@ -614,6 +681,9 @@ export function App() {
     setMbtiAnswers(emptyMbtiAnswers);
     setMbtiScores(emptyMbtiScores);
     setNightChoices([]);
+    setRogueRun(null);
+    setArenaPaused(false);
+    setArenaPanelOpen(false);
     setLinkedNightType("");
     setResonanceEntry(null);
     setActiveParcel(null);
@@ -659,6 +729,68 @@ export function App() {
       }
     }
   };
+
+  useEffect(() => {
+    drawArena(arenaCanvas.current, rogueRun, rogueAim.current);
+  }, [rogueRun]);
+
+  useEffect(() => {
+    if (screen !== "rogueArena" || rogueRun?.phase !== "running") return undefined;
+    const handleKeyDown = (event) => {
+      const key = event.key.toLowerCase();
+      const controlMap = { w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right" };
+      if (controlMap[key]) {
+        event.preventDefault();
+        setRogueControl(controlMap[key], true);
+      }
+      if (event.code === "Space") {
+        event.preventDefault();
+        queueRogueDash();
+      }
+      if (event.key === "Tab") {
+        event.preventDefault();
+        setArenaPanelOpen(true);
+        setArenaPaused(true);
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setArenaPaused((current) => !current);
+      }
+    };
+    const handleKeyUp = (event) => {
+      const key = event.key.toLowerCase();
+      const controlMap = { w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right" };
+      if (controlMap[key]) setRogueControl(controlMap[key], false);
+    };
+    const timer = window.setInterval(() => {
+      if (arenaPaused) return;
+      const input = { ...rogueControls.current, aim: rogueAim.current };
+      rogueControls.current = { ...rogueControls.current, dash: false };
+      setRogueRun((current) => current ? advanceArenaRun(current, input, .05) : current);
+    }, 50);
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keyup", handleKeyUp);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keyup", handleKeyUp);
+    };
+  }, [screen, rogueRun?.phase, arenaPaused]);
+
+  useEffect(() => {
+    const result = getArenaResult(rogueRun);
+    if (!result || creditedRogueRun.current === rogueRun?.seed) return;
+    creditedRogueRun.current = rogueRun?.seed;
+    setRogueMeta((current) => {
+      const updated = {
+        embers: Math.min(30, current.embers + result.embers),
+        runs: current.runs + 1,
+        clears: current.clears + (rogueRun?.phase === "cleared" ? 1 : 0),
+      };
+      persistRogueMeta(updated);
+      return updated;
+    });
+  }, [rogueRun?.phase]);
 
   return (
     <main className="mobile-prototype" aria-live="polite">
@@ -1113,15 +1245,20 @@ export function App() {
             <section className="rogue-projection">
               <span>本局清障投影</span>
               <strong>{rogueProjection.label}</strong>
-              {rogueProjection.perks.map((perk) => <p key={perk}>{perk}</p>)}
+              {rogueProjection.perks.map((perk) => <p key={perk.label}>{perk.label}：{perk.description}</p>)}
             </section>
-            <div className="rogue-rule-grid"><span>4 个随机节点</span><span>击退后 3 选 1</span><span>失败可立即重开</span></div>
+            <section className="arena-weapon-picker" aria-label="选择初始武器">
+              <span>选择主武器</span>
+              {arenaWeapons.map((weapon) => <button className={rogueWeapon === weapon.id ? "selected" : ""} key={weapon.id} onClick={() => setRogueWeapon(weapon.id)}><strong>{weapon.name}</strong><small>{weapon.description}</small></button>)}
+            </section>
+            <div className="rogue-rule-grid"><span>实时刷怪与闪避</span><span>升级三选一构筑</span><span>事件、商店与 Boss</span></div>
+            <p className="arena-meta-note">局外余烬：{rogueMeta.embers} · 已完成 {rogueMeta.clears} 局。余烬最多提供 +15 起始状态，不会形成数值碾压。</p>
             <button className="night-primary-action" onClick={startRogueRun}>领取清障牌，进入雾港 <CaretRight size={18} weight="bold" /></button>
           </article>
         </section>
       )}
 
-      {screen === "rogue" && rogueRun && (
+      {screen === "rogueLegacy" && rogueRun && (
         <section className="screen rogue-screen">
           <img className="night-scene-image" src={portableAssetUrl(selectedResident.image)} alt={`${selectedResident.name}正在雾港清障`} />
           <div className="night-scene-shade rogue-shade" />
@@ -1177,6 +1314,85 @@ export function App() {
             )}
             {!rogueEnding && rogueRun.history.length > 1 && <p className="rogue-last-log">{rogueRun.history.at(-1).text}</p>}
           </article>
+        </section>
+      )}
+
+      {screen === "rogueArena" && rogueRun && (
+        <section className="screen arena-screen">
+          <img className="night-scene-image" src={portableAssetUrl(selectedResident.image)} alt="雾港清障月台" />
+          <div className="night-scene-shade arena-shade" />
+          <div className="arena-header">
+            <button className="back-control arena-back" onClick={returnToRecord}><ArrowLeft size={19} /> 暂离</button>
+            <span>雾港站台 · {Math.floor(rogueRun.time)}s</span>
+            <div className="arena-header-actions"><button onClick={() => { setArenaPanelOpen(true); setArenaPaused(true); }}>构筑 · Tab</button><button onClick={() => setArenaPaused((current) => !current)}>{arenaPaused ? "继续" : "暂停"} · Esc</button></div>
+          </div>
+          <section className="arena-hud" aria-label="肉鸽战斗状态">
+            <div className="arena-health"><span>状态 {Math.ceil(rogueRun.player.hp)}/{rogueRun.player.maxHp}</span><i><b style={{ width: `${Math.max(0, rogueRun.player.hp / rogueRun.player.maxHp * 100)}%` }} /></i></div>
+            <div className="arena-xp"><span>Lv.{rogueRun.level} · 经验 {rogueRun.xp}/{rogueRun.nextXp}</span><i><b style={{ width: `${Math.min(100, rogueRun.xp / rogueRun.nextXp * 100)}%` }} /></i></div>
+            <div className="arena-numbers"><span>护甲 {rogueRun.player.armor}</span><span>硬币 {rogueRun.coins}</span><span>击退 {rogueRun.kills}</span></div>
+          </section>
+          <section className="arena-stage">
+            <canvas ref={arenaCanvas} className="arena-canvas" width={arenaSize.width} height={arenaSize.height} onPointerMove={updateRogueAim} onPointerDown={updateRogueAim} aria-label="雾港清障战场：使用 WASD 或下方方向键移动，空格或闪避键冲刺" />
+            <p className="arena-message">{rogueRun.message}</p>
+          </section>
+          <section className="arena-loadout" aria-label="当前构筑">
+            <span>{rogueRun.weapon.name} · 自动清障</span>
+            <em>闪避 {rogueRun.player.dashCharges}/{rogueRun.player.dashMax}</em>
+            {rogueRun.upgrades.slice(-3).map((upgrade) => <i key={`${upgrade.id}-${rogueRun.upgrades.indexOf(upgrade)}`}>{upgrade.name}</i>)}
+          </section>
+          {rogueRun.phase === "running" && (
+            <section className="arena-controls" aria-label="移动与闪避控制">
+              <div className="arena-dpad">
+                <button onPointerDown={() => setRogueControl("up", true)} onPointerUp={() => setRogueControl("up", false)} onPointerLeave={() => setRogueControl("up", false)}>▲</button>
+                <button onPointerDown={() => setRogueControl("left", true)} onPointerUp={() => setRogueControl("left", false)} onPointerLeave={() => setRogueControl("left", false)}>◀</button>
+                <button onPointerDown={() => setRogueControl("down", true)} onPointerUp={() => setRogueControl("down", false)} onPointerLeave={() => setRogueControl("down", false)}>▼</button>
+                <button onPointerDown={() => setRogueControl("right", true)} onPointerUp={() => setRogueControl("right", false)} onPointerLeave={() => setRogueControl("right", false)}>▶</button>
+              </div>
+              <button className="arena-dash" onClick={queueRogueDash}>闪避<br /><small>Space</small></button>
+            </section>
+          )}
+          {rogueRun.phase === "upgrade" && (
+            <section className="arena-modal" aria-label="升级三选一">
+              <span>等级提升 · 选择强化</span>
+              <h2>雾港会记住你的构筑。</h2>
+              <div className="arena-choice-list">{rogueRun.offer.map((upgrade) => <button key={upgrade.id} onClick={() => chooseRogueUpgrade(upgrade.id)}><em>{upgrade.category}</em><strong>{upgrade.name}</strong><small>{upgrade.description}</small></button>)}</div>
+            </section>
+          )}
+          {rogueRun.phase === "event" && (
+            <section className="arena-modal" aria-label="随机事件">
+              <span>随机事件 · 故障装置</span>
+              <h2>装置里传来一段尚未寄出的求救信号。</h2>
+              <div className="arena-choice-list"><button onClick={() => chooseRogueEvent("open")}><strong>拆开装置</strong><small>失去 20% 当前状态，获得一份随机强化。</small></button><button onClick={() => chooseRogueEvent("help")}><strong>回传信号</strong><small>获得 7 硬币并修复 10 点状态。</small></button></div>
+            </section>
+          )}
+          {rogueRun.phase === "shop" && (
+            <section className="arena-modal" aria-label="故障商人">
+              <span>商店 · 潮湿货柜</span>
+              <h2>故障商人只收本局硬币。</h2>
+              <div className="arena-choice-list">{rogueRun.shop.map((item) => <button key={item.id} disabled={rogueRun.coins < item.cost} onClick={() => buyRogueShopItem(item.id)}><em>{item.cost} 枚硬币</em><strong>{item.name}</strong><small>{item.description}</small></button>)}</div>
+              <button className="quiet-button arena-leave-shop" onClick={leaveRogueShop}>离开货柜</button>
+            </section>
+          )}
+          {rogueEnding && (
+            <section className={`arena-modal arena-ending ${rogueRun.phase === "lost" ? "lost" : ""}`} aria-label="本局结算">
+              <span>{rogueEnding.title}</span>
+              <h2>{rogueEnding.embers} 枚余烬核心已归档</h2>
+              <p>{rogueEnding.text}</p>
+              <div className="arena-result-stats"><span>等级 {rogueRun.level}</span><span>击退 {rogueRun.kills}</span><span>强化 {rogueRun.upgrades.length}</span></div>
+              <button className="night-primary-action" onClick={replayRogueRun}>以同一居民重开雾港 <Sparkle size={18} weight="fill" /></button>
+              <button className="quiet-button" onClick={returnToRecord}>返回图鉴</button>
+            </section>
+          )}
+          {(arenaPanelOpen || arenaPaused) && !rogueEnding && rogueRun.phase === "running" && (
+            <section className="arena-modal arena-build-panel" aria-label="角色属性与构筑">
+              <span>{arenaPanelOpen ? "角色属性与构筑 · Tab" : "暂停"}</span>
+              <h2>{selectedResident.name}的雾港回收记录</h2>
+              <div className="arena-build-stats"><span>状态 {Math.ceil(rogueRun.player.hp)}/{rogueRun.player.maxHp}</span><span>攻击 {Math.round(rogueRun.player.damage)}</span><span>暴击 {Math.round(rogueRun.player.crit * 100)}%</span><span>速度 {Math.round(rogueRun.player.speed)}</span><span>投射物 {rogueRun.player.projectiles}</span><span>穿透 {rogueRun.player.pierce}</span></div>
+              <section className="arena-build-section"><strong>主武器 · {rogueRun.weapon.name}</strong><p>{rogueRun.weapon.description}</p></section>
+              <section className="arena-build-section"><strong>本局强化 · {rogueRun.upgrades.length}</strong>{rogueRun.upgrades.length ? rogueRun.upgrades.map((upgrade, index) => <p key={`${upgrade.id}-${index}`}>{upgrade.name} · {upgrade.description}</p>) : <p>尚未获得强化。击退异常并收集经验可升级。</p>}</section>
+              <button className="night-primary-action" onClick={() => { setArenaPanelOpen(false); setArenaPaused(false); }}>继续清障 <CaretRight size={18} weight="bold" /></button>
+            </section>
+          )}
         </section>
       )}
 
