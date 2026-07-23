@@ -17,6 +17,7 @@ import {
 import { mbtiDossierByType } from "./mbtiDossiers";
 import { mbtiDeepReports, mbtiFunctionGlossary } from "./mbtiDeepReports";
 import { mbtiNarrativeProfiles } from "./mbtiNarratives";
+import { getResidentCampaign } from "./residentCampaigns";
 import { nightChapters, resolveNightEnding, resolveNightStagePrompt } from "./nightChapters";
 import { mbtiQuestions } from "./mbtiQuestions";
 import { getWorldArtifact, worldArchiveData } from "./worldArchive";
@@ -35,15 +36,23 @@ import {
 import {
   advanceArenaRun,
   arenaSize,
+  boardArenaTrain,
   arenaWeapons,
+  beginNextArenaWave,
   buyArenaShopItem,
   chooseArenaEvent,
+  chooseArenaRelic,
   chooseArenaUpgrade,
   createArenaRun,
   drawArena,
+  getArenaCamera,
+  getArenaObjective,
   getArenaProjection,
   getArenaResult,
   leaveArenaShop,
+  leaveArenaNpcInteraction,
+  skipArenaBoarding,
+  skipArenaWave,
 } from "./fogRogueArena";
 
 const portableAssetUrl = (path) =>
@@ -279,14 +288,14 @@ const persistLocalRecords = (storageKey, records) => {
 };
 
 const loadRogueMeta = () => {
-  if (typeof window === "undefined") return { embers: 0, runs: 0, clears: 0 };
+  if (typeof window === "undefined") return { embers: 0, runs: 0, clears: 0, unlocks: [] };
   try {
     const stored = JSON.parse(window.localStorage.getItem(rogueMetaStorageKey) ?? "null");
     return stored && typeof stored === "object"
-      ? { embers: Number(stored.embers) || 0, runs: Number(stored.runs) || 0, clears: Number(stored.clears) || 0 }
-      : { embers: 0, runs: 0, clears: 0 };
+      ? { embers: Number(stored.embers) || 0, runs: Number(stored.runs) || 0, clears: Number(stored.clears) || 0, unlocks: Array.isArray(stored.unlocks) ? stored.unlocks : [] }
+      : { embers: 0, runs: 0, clears: 0, unlocks: [] };
   } catch {
-    return { embers: 0, runs: 0, clears: 0 };
+    return { embers: 0, runs: 0, clears: 0, unlocks: [] };
   }
 };
 
@@ -331,6 +340,8 @@ export function App() {
   const [rogueMeta, setRogueMeta] = useState(loadRogueMeta);
   const [arenaPaused, setArenaPaused] = useState(false);
   const [arenaPanelOpen, setArenaPanelOpen] = useState(false);
+  const [arenaDebug, setArenaDebug] = useState(false);
+  const [arenaFastForward, setArenaFastForward] = useState(false);
   const [expeditionArchive, setExpeditionArchive] = useState(() => loadLocalRecords(expeditionArchiveStorageKey));
   const [resonanceInbox, setResonanceInbox] = useState(() => loadLocalRecords(resonanceInboxStorageKey));
   const [resonanceInput, setResonanceInput] = useState("");
@@ -347,8 +358,8 @@ export function App() {
   const [saveState, setSaveState] = useState("idle");
   const fileInput = useRef(null);
   const arenaCanvas = useRef(null);
-  const rogueControls = useRef({ up: false, down: false, left: false, right: false, dash: false });
-  const rogueAim = useRef({ x: arenaSize.width / 2, y: arenaSize.height / 2 });
+  const rogueControls = useRef({ up: false, down: false, left: false, right: false, dash: false, interact: false });
+  const rogueAim = useRef({ x: arenaSize.worldWidth - 90, y: arenaSize.worldHeight / 2 + 18 });
   const creditedRogueRun = useRef(null);
   const activeRoleplayType = linkedNightType || mbtiType;
   const selectedResident = resultSource === "mbti"
@@ -372,7 +383,11 @@ export function App() {
     ? resolveExpeditionEnding(expeditionRun)
     : null;
   const rogueEnding = getArenaResult(rogueRun);
+  const arenaObjective = getArenaObjective(rogueRun);
+  const nearbyArenaNpc = rogueRun?.npcs?.find((npc) => npc.id === rogueRun.nearbyNpcId) ?? null;
+  const activeArenaNpc = rogueRun?.npcs?.find((npc) => npc.id === rogueRun.activeNpcId) ?? null;
   const rogueProjection = getArenaProjection(mbtiType);
+  const residentCampaign = getResidentCampaign(mbtiType);
   const worldDistricts = deriveWorldDistricts(expeditionArchive, resonanceInbox);
   const latestExpeditionParcel = activeParcel ?? expeditionArchive[0]?.parcel ?? null;
   const resonanceTarget = resonanceEntry ? mbtiDossierByType[resonanceEntry.target] : null;
@@ -509,21 +524,78 @@ export function App() {
     setRogueRun(null);
     setArenaPaused(false);
     setArenaPanelOpen(false);
+    setArenaDebug(false);
     setScreen("rogueBriefing");
   };
 
   const startRogueRun = () => {
     creditedRogueRun.current = null;
-    rogueControls.current = { up: false, down: false, left: false, right: false, dash: false };
-    rogueAim.current = { x: arenaSize.width / 2, y: arenaSize.height / 2 };
+    setArenaFastForward(false);
+    rogueControls.current = { up: false, down: false, left: false, right: false, dash: false, interact: false };
+    rogueAim.current = { x: arenaSize.worldWidth - 90, y: arenaSize.worldHeight / 2 + 18 };
     setArenaPaused(false);
     setArenaPanelOpen(false);
-    setRogueRun(createArenaRun(mbtiType, rogueWeapon, rogueMeta));
+    setArenaDebug(false);
+    setRogueRun(createArenaRun(mbtiType, rogueWeapon, rogueMeta, Date.now(), {
+      name: selectedResident?.name,
+      visualStyle: selectedResident?.visualStyle ?? selectedResident?.level,
+      traits: selectedResident?.traits ?? [],
+    }));
+    setScreen("rogueArena");
+  };
+
+  const launchQuickRogue = () => {
+    // A no-questionnaire demo route. The player is still a fictional Fog Harbor
+    // resident; this shortcut never derives a real-person profile or result.
+    const quickType = "INTJ";
+    const quickWeapon = "pulsePistol";
+    const quickResident = { ...mbtiDossierByType[quickType], ...mbtiNarrativeProfiles[quickType] };
+    creditedRogueRun.current = null;
+    setArenaFastForward(false);
+    rogueControls.current = { up: false, down: false, left: false, right: false, dash: false, interact: false };
+    rogueAim.current = { x: arenaSize.worldWidth - 90, y: arenaSize.worldHeight / 2 + 18 };
+    setLinkedNightType("");
+    setMbtiType(quickType);
+    setResultSource("mbti");
+    setRogueWeapon(quickWeapon);
+    setArenaPaused(false);
+    setArenaPanelOpen(false);
+    setArenaDebug(false);
+    setRogueRun(createArenaRun(quickType, quickWeapon, rogueMeta, Date.now(), {
+      name: quickResident.name,
+      visualStyle: quickResident.visualStyle ?? quickResident.level,
+      traits: quickResident.traits ?? [],
+    }));
     setScreen("rogueArena");
   };
 
   const chooseRogueUpgrade = (upgradeId) => {
     setRogueRun((current) => current ? chooseArenaUpgrade(current, upgradeId) : current);
+    window.setTimeout(() => {
+      setRogueRun((current) => current?.phase === "upgradeReveal"
+        ? { ...current, phase: "running", effectNotice: "" }
+        : current);
+    }, 1000);
+  };
+
+  const chooseRogueRelic = (relicId) => {
+    setRogueRun((current) => current ? chooseArenaRelic(current, relicId) : current);
+  };
+
+  const beginRogueNextWave = () => {
+    setRogueRun((current) => current ? beginNextArenaWave(current) : current);
+  };
+
+  const boardRogueTrain = () => {
+    setRogueRun((current) => current ? boardArenaTrain(current) : current);
+  };
+
+  const skipRogueWave = () => {
+    setRogueRun((current) => current ? skipArenaWave(current) : current);
+  };
+
+  const skipRogueBoarding = () => {
+    setRogueRun((current) => current ? skipArenaBoarding(current) : current);
   };
 
   const chooseRogueEvent = (choiceId) => {
@@ -550,11 +622,20 @@ export function App() {
     rogueControls.current = { ...rogueControls.current, dash: true };
   };
 
+  const queueRogueInteraction = () => {
+    rogueControls.current = { ...rogueControls.current, interact: true };
+  };
+
+  const closeRogueNpcInteraction = () => {
+    setRogueRun((current) => current ? leaveArenaNpcInteraction(current) : current);
+  };
+
   const updateRogueAim = (event) => {
     const bounds = event.currentTarget.getBoundingClientRect();
+    const camera = getArenaCamera(rogueRun);
     rogueAim.current = {
-      x: clamp((event.clientX - bounds.left) * arenaSize.width / bounds.width, 0, arenaSize.width),
-      y: clamp((event.clientY - bounds.top) * arenaSize.height / bounds.height, 0, arenaSize.height),
+      x: clamp(camera.x + (event.clientX - bounds.left) * arenaSize.width / bounds.width, 0, arenaSize.worldWidth),
+      y: clamp(camera.y + (event.clientY - bounds.top) * arenaSize.height / bounds.height, 0, arenaSize.worldHeight),
     };
   };
 
@@ -666,6 +747,7 @@ export function App() {
     setLinkedNightType("");
     setArenaPaused(false);
     setArenaPanelOpen(false);
+    setArenaDebug(false);
     setScreen("record");
   };
 
@@ -684,6 +766,7 @@ export function App() {
     setRogueRun(null);
     setArenaPaused(false);
     setArenaPanelOpen(false);
+    setArenaDebug(false);
     setLinkedNightType("");
     setResonanceEntry(null);
     setActiveParcel(null);
@@ -731,11 +814,11 @@ export function App() {
   };
 
   useEffect(() => {
-    drawArena(arenaCanvas.current, rogueRun, rogueAim.current);
-  }, [rogueRun]);
+    drawArena(arenaCanvas.current, rogueRun, rogueAim.current, { debug: arenaDebug });
+  }, [rogueRun, arenaDebug]);
 
   useEffect(() => {
-    if (screen !== "rogueArena" || rogueRun?.phase !== "running") return undefined;
+    if (screen !== "rogueArena" || !["running", "boarding"].includes(rogueRun?.phase)) return undefined;
     const handleKeyDown = (event) => {
       const key = event.key.toLowerCase();
       const controlMap = { w: "up", arrowup: "up", s: "down", arrowdown: "down", a: "left", arrowleft: "left", d: "right", arrowright: "right" };
@@ -746,6 +829,10 @@ export function App() {
       if (event.code === "Space") {
         event.preventDefault();
         queueRogueDash();
+      }
+      if (key === "e") {
+        event.preventDefault();
+        queueRogueInteraction();
       }
       if (event.key === "Tab") {
         event.preventDefault();
@@ -765,8 +852,13 @@ export function App() {
     const timer = window.setInterval(() => {
       if (arenaPaused) return;
       const input = { ...rogueControls.current, aim: rogueAim.current };
-      rogueControls.current = { ...rogueControls.current, dash: false };
-      setRogueRun((current) => current ? advanceArenaRun(current, input, .05) : current);
+      rogueControls.current = { ...rogueControls.current, dash: false, interact: false };
+      const steps = arenaFastForward ? 6 : 1;
+      setRogueRun((current) => {
+        let simulated = current;
+        for (let step = 0; step < steps && simulated; step += 1) simulated = advanceArenaRun(simulated, input, .05);
+        return simulated;
+      });
     }, 50);
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
@@ -775,7 +867,7 @@ export function App() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [screen, rogueRun?.phase, arenaPaused]);
+  }, [screen, rogueRun?.phase, arenaPaused, arenaFastForward]);
 
   useEffect(() => {
     const result = getArenaResult(rogueRun);
@@ -786,6 +878,7 @@ export function App() {
         embers: Math.min(30, current.embers + result.embers),
         runs: current.runs + 1,
         clears: current.clears + (rogueRun?.phase === "cleared" ? 1 : 0),
+        unlocks: result.unlockId ? Array.from(new Set([...(current.unlocks ?? []), result.unlockId])) : (current.unlocks ?? []),
       };
       persistRogueMeta(updated);
       return updated;
@@ -793,7 +886,7 @@ export function App() {
   }, [rogueRun?.phase]);
 
   return (
-    <main className="mobile-prototype" aria-live="polite">
+    <main className={`mobile-prototype ${screen === "rogueArena" ? "arena-prototype" : ""}`} aria-live="polite">
       <input
         ref={fileInput}
         className="visually-hidden"
@@ -823,7 +916,10 @@ export function App() {
             <span className="eyebrow"><span className="signal-dot" /> 彼界目击 · 07 号维修区</span>
             <h1>血线维修员</h1>
             <p>它正在替末班列车接回断开的黑色线缆。</p>
-            <button className="mbti-entry" onClick={() => setScreen("mbti")}><Archive size={16} weight="duotone" /> 开始 MBTI 场景问卷</button>
+            <div className="observe-shortcuts">
+              <button className="mbti-entry" onClick={() => setScreen("mbti")}><Archive size={16} weight="duotone" /> 开始 MBTI 场景问卷</button>
+              <button className="rogue-quick-entry" onClick={launchQuickRogue}><Crosshair size={16} weight="bold" /> 直接进入肉鸽</button>
+            </div>
           </div>
 
           <div className="camera-dock">
@@ -1247,6 +1343,11 @@ export function App() {
               <strong>{rogueProjection.label}</strong>
               {rogueProjection.perks.map((perk) => <p key={perk.label}>{perk.label}：{perk.description}</p>)}
             </section>
+            <section className="resident-campaign-preview" aria-label="角色工作地图">
+              <span>角色工作地图 · {residentCampaign.title}</span>
+              <div>{residentCampaign.stages.map((stage, index) => <article key={stage.id}><em>第 {index + 1} 站</em><strong>{stage.name}</strong><small>{stage.hint}</small><p>{stage.mechanic}</p>{stage.contact && <i>接应：{stage.contact.name} · {stage.contact.role}</i>}</article>)}</div>
+              <p>当前使用环境原型与接应剪影；收到对应人物建模后，将直接替换为角色入场与车厢接应模型。</p>
+            </section>
             <section className="arena-weapon-picker" aria-label="选择初始武器">
               <span>选择主武器</span>
               {arenaWeapons.map((weapon) => <button className={rogueWeapon === weapon.id ? "selected" : ""} key={weapon.id} onClick={() => setRogueWeapon(weapon.id)}><strong>{weapon.name}</strong><small>{weapon.description}</small></button>)}
@@ -1318,27 +1419,34 @@ export function App() {
       )}
 
       {screen === "rogueArena" && rogueRun && (
-        <section className="screen arena-screen">
+        <section className={`screen arena-screen ${rogueRun.phase === "boarding" ? "arena-cinematic" : ""}`}>
           <img className="night-scene-image" src={portableAssetUrl(selectedResident.image)} alt="雾港清障月台" />
           <div className="night-scene-shade arena-shade" />
           <div className="arena-header">
-            <button className="back-control arena-back" onClick={returnToRecord}><ArrowLeft size={19} /> 暂离</button>
-            <span>雾港站台 · {Math.floor(rogueRun.time)}s</span>
-            <div className="arena-header-actions"><button onClick={() => { setArenaPanelOpen(true); setArenaPaused(true); }}>构筑 · Tab</button><button onClick={() => setArenaPaused((current) => !current)}>{arenaPaused ? "继续" : "暂停"} · Esc</button></div>
+            <button className="back-control arena-back" onClick={returnToRecord}><ArrowLeft size={19} /> 离开战场</button>
+            <span>{rogueRun.layout?.name ?? "雾港站台"} · {Math.floor(rogueRun.time)}s</span>
+            <div className="arena-header-actions"><button className={arenaDebug ? "active" : ""} onClick={() => setArenaDebug((current) => !current)}>{arenaDebug ? "隐藏碰撞" : "碰撞"}</button><button className="arena-skip-wave" disabled={rogueRun.phase !== "running"} onClick={skipRogueWave}>跳过波次</button><button className={arenaFastForward ? "active arena-fast-forward" : "arena-fast-forward"} onClick={() => setArenaFastForward((current) => !current)}>{arenaFastForward ? "快进 ×6" : "快进"}</button><button onClick={() => { setArenaPanelOpen(true); setArenaPaused(true); }}>构筑 · Tab</button><button onClick={() => setArenaPaused((current) => !current)}>{arenaPaused ? "继续" : "暂停"} · Esc</button></div>
           </div>
           <section className="arena-hud" aria-label="肉鸽战斗状态">
-            <div className="arena-health"><span>状态 {Math.ceil(rogueRun.player.hp)}/{rogueRun.player.maxHp}</span><i><b style={{ width: `${Math.max(0, rogueRun.player.hp / rogueRun.player.maxHp * 100)}%` }} /></i></div>
-            <div className="arena-xp"><span>Lv.{rogueRun.level} · 经验 {rogueRun.xp}/{rogueRun.nextXp}</span><i><b style={{ width: `${Math.min(100, rogueRun.xp / rogueRun.nextXp * 100)}%` }} /></i></div>
-            <div className="arena-numbers"><span>护甲 {rogueRun.player.armor}</span><span>硬币 {rogueRun.coins}</span><span>击退 {rogueRun.kills}</span></div>
+            <div className="arena-vital-block"><span>生命 {Math.ceil(rogueRun.player.hp)}/{rogueRun.player.maxHp}</span><i><b style={{ width: `${Math.max(0, rogueRun.player.hp / rogueRun.player.maxHp * 100)}%` }} /></i></div>
+            <div className="arena-vital-block xp"><span>Lv.{rogueRun.level} · 经验 {rogueRun.xp}/{rogueRun.nextXp}</span><i><b style={{ width: `${Math.min(100, rogueRun.xp / rogueRun.nextXp * 100)}%` }} /></i></div>
+            <div className="arena-objective"><span>{arenaObjective.label}</span><strong>{arenaObjective.value}</strong></div>
+            <div className="arena-currency"><span>硬币</span><strong>{rogueRun.coins}</strong><small>护甲 {rogueRun.player.armor}</small></div>
           </section>
           <section className="arena-stage">
+            <div className="arena-map-identity">
+              <span>{rogueRun.layout?.name ?? "雾港站台"} · {rogueRun.layout?.hint ?? "战术路线"}</span>
+              <small>补给箱、出口、精英与 Boss 已标记到小地图</small>
+            </div>
             <canvas ref={arenaCanvas} className="arena-canvas" width={arenaSize.width} height={arenaSize.height} onPointerMove={updateRogueAim} onPointerDown={updateRogueAim} aria-label="雾港清障战场：使用 WASD 或下方方向键移动，空格或闪避键冲刺" />
             <p className="arena-message">{rogueRun.message}</p>
           </section>
+          {rogueRun.phase === "boarding" && <button className="arena-cinematic-skip" onClick={skipRogueBoarding}>跳过接引过场</button>}
           <section className="arena-loadout" aria-label="当前构筑">
-            <span>{rogueRun.weapon.name} · 自动清障</span>
-            <em>闪避 {rogueRun.player.dashCharges}/{rogueRun.player.dashMax}</em>
+            <span><strong>{rogueRun.weapon.name}</strong> · 自动清障</span>
+            <em>闪避 {rogueRun.player.dashCharges}/{rogueRun.player.dashMax} · 冷却 {rogueRun.player.dashRecharge.toFixed(1)}s</em>
             {rogueRun.upgrades.slice(-3).map((upgrade) => <i key={`${upgrade.id}-${rogueRun.upgrades.indexOf(upgrade)}`}>{upgrade.name}</i>)}
+            {nearbyArenaNpc && rogueRun.phase === "running" && <button className="arena-npc-prompt" onClick={queueRogueInteraction}>交谈 · {nearbyArenaNpc.name} · E</button>}
           </section>
           {rogueRun.phase === "running" && (
             <section className="arena-controls" aria-label="移动与闪避控制">
@@ -1349,6 +1457,18 @@ export function App() {
                 <button onPointerDown={() => setRogueControl("right", true)} onPointerUp={() => setRogueControl("right", false)} onPointerLeave={() => setRogueControl("right", false)}>▶</button>
               </div>
               <button className="arena-dash" onClick={queueRogueDash}>闪避<br /><small>Space</small></button>
+              {nearbyArenaNpc && <button className="arena-interact-touch" onClick={queueRogueInteraction}>交谈<br /><small>E</small></button>}
+            </section>
+          )}
+          {rogueRun.phase === "npcInteraction" && activeArenaNpc && (
+            <section className="arena-modal arena-npc-dialogue" aria-label={`${activeArenaNpc.name} 交互`}>
+              <span>{activeArenaNpc.category === "shop" ? "交易接引" : activeArenaNpc.category === "route" ? "路线接引" : activeArenaNpc.category === "function" ? "站内功能" : "工作现场记录"}</span>
+              <h2>{activeArenaNpc.name}</h2>
+              <p className="arena-npc-role">{activeArenaNpc.role} · 正在{activeArenaNpc.action}</p>
+              <div className="arena-npc-dialogue-line"><em>识别物</em><strong>{activeArenaNpc.prop}</strong><p>“{activeArenaNpc.line}”</p></div>
+              <p className="arena-npc-landmark">工作位置 · {activeArenaNpc.landmark ?? "站台服务带"}</p>
+              <p className="arena-npc-footnote">非敌对固定接引者 · 不占用怪物刷怪点或碰撞路径</p>
+              <button className="night-primary-action" onClick={closeRogueNpcInteraction}>结束交谈 · 返回战场 <CaretRight size={18} weight="bold" /></button>
             </section>
           )}
           {rogueRun.phase === "upgrade" && (
@@ -1356,6 +1476,39 @@ export function App() {
               <span>等级提升 · 选择强化</span>
               <h2>雾港会记住你的构筑。</h2>
               <div className="arena-choice-list">{rogueRun.offer.map((upgrade) => <button key={upgrade.id} onClick={() => chooseRogueUpgrade(upgrade.id)}><em>{upgrade.category}</em><strong>{upgrade.name}</strong><small>{upgrade.description}</small></button>)}</div>
+            </section>
+          )}
+          {rogueRun.phase === "upgradeReveal" && (
+            <section className="arena-modal arena-effect-reveal" aria-label="强化效果已生效">
+              <span>强化生效 · 战斗暂缓</span>
+              <h2>{rogueRun.upgrades.at(-1)?.name}</h2>
+              <p>{rogueRun.effectNotice}</p>
+              <div className="arena-effect-stats"><span>攻击 {Math.round(rogueRun.player.damage)}</span><span>投射物 {rogueRun.player.projectiles}</span><span>穿透 {rogueRun.player.pierce}</span></div>
+            </section>
+          )}
+          {rogueRun.phase === "waveComplete" && (
+            <section className="arena-modal arena-wave-transition" aria-label="波次完成">
+              <span>封锁解除 · 第 {rogueRun.wave}/12 波</span>
+              <h2>{arenaObjective.label}</h2>
+              <p>站台短暂安静下来。下一波将从新的方向推进，保持绕行路线。</p>
+              <button className="night-primary-action" onClick={beginRogueNextWave}>进入下一波 <CaretRight size={18} weight="bold" /></button>
+            </section>
+          )}
+          {rogueRun.phase === "transit" && (
+            <section className="arena-modal arena-train-transit" aria-label="列车转乘">
+              <span>月台转乘许可 · 已清理第 {rogueRun.wave}/12 波</span>
+              <h2>乘坐列车前往 {rogueRun.layout?.destination ?? "下一站"}</h2>
+              <p>{rogueRun.layout?.transitionText ?? "雾中的列车已停靠。转乘后会保留当前构筑，恢复少量生命并补满闪避。"}</p>
+              {rogueRun.layout?.contact && <div className="arena-contact-card"><span>接应人员 · {rogueRun.layout.contact.role}</span><strong>{rogueRun.layout.contact.name}</strong><p>“{rogueRun.layout.contact.line}”</p></div>}
+              <div className="arena-effect-stats"><span>保留强化 {rogueRun.upgrades.length}</span><span>保留遗物 {rogueRun.relics.length}</span><span>恢复 14 生命</span></div>
+              <button className="night-primary-action" onClick={boardRogueTrain}>登上末班列车 · 播放接引过场 <CaretRight size={18} weight="bold" /></button>
+            </section>
+          )}
+          {rogueRun.phase === "waveReward" && (
+            <section className="arena-modal" aria-label="波次遗物三选一">
+              <span>封锁解除 · 选择 1 件遗物</span>
+              <h2>雾港留下了可装配的回收物。</h2>
+              <div className="arena-choice-list">{rogueRun.relicOffer.map((relic) => <button key={relic.id} onClick={() => chooseRogueRelic(relic.id)}><em>遗物</em><strong>{relic.name}</strong><small>{relic.description}</small></button>)}</div>
             </section>
           )}
           {rogueRun.phase === "event" && (
@@ -1378,6 +1531,7 @@ export function App() {
               <span>{rogueEnding.title}</span>
               <h2>{rogueEnding.embers} 枚余烬核心已归档</h2>
               <p>{rogueEnding.text}</p>
+              {rogueEnding.unlock && <p className="arena-unlock">{rogueEnding.unlock}</p>}
               <div className="arena-result-stats"><span>等级 {rogueRun.level}</span><span>击退 {rogueRun.kills}</span><span>强化 {rogueRun.upgrades.length}</span></div>
               <button className="night-primary-action" onClick={replayRogueRun}>以同一居民重开雾港 <Sparkle size={18} weight="fill" /></button>
               <button className="quiet-button" onClick={returnToRecord}>返回图鉴</button>
@@ -1390,6 +1544,7 @@ export function App() {
               <div className="arena-build-stats"><span>状态 {Math.ceil(rogueRun.player.hp)}/{rogueRun.player.maxHp}</span><span>攻击 {Math.round(rogueRun.player.damage)}</span><span>暴击 {Math.round(rogueRun.player.crit * 100)}%</span><span>速度 {Math.round(rogueRun.player.speed)}</span><span>投射物 {rogueRun.player.projectiles}</span><span>穿透 {rogueRun.player.pierce}</span></div>
               <section className="arena-build-section"><strong>主武器 · {rogueRun.weapon.name}</strong><p>{rogueRun.weapon.description}</p></section>
               <section className="arena-build-section"><strong>本局强化 · {rogueRun.upgrades.length}</strong>{rogueRun.upgrades.length ? rogueRun.upgrades.map((upgrade, index) => <p key={`${upgrade.id}-${index}`}>{upgrade.name} · {upgrade.description}</p>) : <p>尚未获得强化。击退异常并收集经验可升级。</p>}</section>
+              <section className="arena-build-section"><strong>已装配遗物 · {rogueRun.relics.length}</strong>{rogueRun.relics.length ? rogueRun.relics.map((relic) => <p key={relic.id}>{relic.name} · {relic.description}</p>) : <p>每两波可从三件遗物中选择一件。</p>}</section>
               <button className="night-primary-action" onClick={() => { setArenaPanelOpen(false); setArenaPaused(false); }}>继续清障 <CaretRight size={18} weight="bold" /></button>
             </section>
           )}
